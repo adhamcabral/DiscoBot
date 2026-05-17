@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle do Bot</title>
+    <link rel="stylesheet" href="/css/style_new.css">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">
+            <h1>🤖 Bot Control</h1>
+        </div>
+        <nav class="nav">
+            <a href="#status" class="nav-item active" data-section="status">
+                <span class="icon">📊</span>
+                <span class="label">Status</span>
+            </a>
+            <a href="#tools" class="nav-item" data-section="tools">
+                <span class="icon">🛠️</span>
+                <span class="label">Ferramentas</span>
+            </a>
+            <a href="#logs" class="nav-item" data-section="logs">
+                <span class="icon">📝</span>
+                <span class="label">Logs</span>
+            </a>
+            <a href="#personality" class="nav-item" data-section="personality">
+                <span class="icon">🧠</span>
+                <span class="label">Personalidade</span>
+            </a>
+            <a href="#users" class="nav-item" data-section="users">
+                <span class="icon">👥</span>
+                <span class="label">Usuários</span>
+            </a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <!-- STATUS SECTION -->
+        <section id="status-section" class="content-section active">
+            <div class="section-header">
+                <h2>Status do Bot</h2>
+                <div id="connection-indicator" class="connection-indicator">
+                    <span class="dot"></span>
+                    <span>Conectado</span>
+                </div>
+            </div>
+
+            <div class="cards-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🟢</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Status</div>
+                        <div id="bot-status" class="stat-value">Offline</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👤</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Usuário</div>
+                        <div id="bot-user" class="stat-value">N/A</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🏠</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Servidores</div>
+                        <div id="bot-servers" class="stat-value">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Uptime</div>
+                        <div id="bot-uptime" class="stat-value">N/A</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Controles do Bot</h3>
+                <div class="control-buttons-horizontal">
+                    <form action="/bot-control" method="POST" style="margin: 0;">
+                        <input type="hidden" name="action" value="start">
+                        <button type="submit" class="btn btn-success">▶️ Iniciar</button>
+                    </form>
+                    <form action="/bot-control" method="POST" style="margin: 0;">
+                        <input type="hidden" name="action" value="restart">
+                        <button type="submit" class="btn btn-warning">🔄 Reiniciar</button>
+                    </form>
+                    <form action="/bot-control" method="POST" style="margin: 0;">
+                        <input type="hidden" name="action" value="stop">
+                        <button type="submit" class="btn btn-danger">⏹️ Parar</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- TOOLS SECTION -->
+        <section id="tools-section" class="content-section">
+            <div class="section-header">
+                <h2>Gerenciamento de Ferramentas</h2>
+                <span class="badge" id="tools-count">0 ferramentas</span>
+            </div>
+
+            <div class="card">
+                <h3>Status do MCP Server</h3>
+                <div class="mcp-status-container">
+                    <div class="mcp-status-indicator" id="mcp-status">
+                        <span class="dot"></span>
+                        <span class="status-text">Desconectado</span>
+                    </div>
+                    <div class="mcp-info">
+                        <p><strong>Tools Server:</strong> <span id="mcp-server-url">http://localhost:3001</span></p>
+                        <p><strong>Tools disponíveis:</strong> <span id="mcp-tools-count">0</span></p>
+                        <p><strong>Tools habilitadas:</strong> <span id="mcp-tools-enabled">0</span></p>
+                        <p id="mcp-reconnect-info" style="display: none;"><strong>Tentativas de reconexão:</strong> <span id="mcp-reconnect-attempts">0</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Modelo de Linguagem</h3>
+                <div class="model-selector">
+                    <select id="model-select" onchange="changeModel(this.value)">
+                        <!-- Modelos serão preenchidos via JavaScript -->
+                    </select>
+                    <button onclick="refreshModels()" class="btn-small btn-secondary">🔄 Atualizar Lista</button>
+                    <button onclick="restartBotAfterModelChange()" class="btn-small btn-warning" id="restart-bot-btn" style="display: none;">🔄 Reiniciar Bot</button>
+                </div>
+                <p class="info-text model-info">
+                    <strong>Modelo atual:</strong> <span id="current-model">Carregando...</span><br>
+                    <strong>Última atualização:</strong> <span id="models-last-update">Carregando...</span>
+                </p>
+            </div>
+
+            <div id="tools-container" class="tools-grid">
+                <!-- Ferramentas serão inseridas aqui -->
+            </div>
+        </section>
+
+        <!-- LOGS SECTION -->
+        <section id="logs-section" class="content-section">
+            <div class="section-header">
+                <h2>Logs do Sistema</h2>
+                <div class="tabs">
+                    <button class="tab active" data-tab="interaction">Interações</button>
+                    <button class="tab" data-tab="system">Sistema</button>
+                </div>
+            </div>
+
+            <div class="tab-content active" id="interaction-tab">
+                <div id="interaction-logs-list" class="logs-container">
+                    <!-- Logs de interação -->
+                </div>
+            </div>
+
+            <div class="tab-content" id="system-tab">
+                <div id="system-logs-list" class="logs-container">
+                    <!-- Logs do sistema -->
+                </div>
+            </div>
+        </section>
+
+        <!-- PERSONALITY SECTION -->
+        <section id="personality-section" class="content-section">
+            <div class="section-header">
+                <h2>Personalidade do Bot</h2>
+                <span class="info-text">Defina como o bot deve se comportar e responder</span>
+            </div>
+
+            <div class="card">
+                <form id="prompt-editor-form" action="/save-prompt" method="POST">
+                    <textarea name="prompt" id="prompt-textarea" placeholder="Escreva a personalidade do bot aqui..."><%= promptContent %></textarea>
+                    <button type="submit" class="btn btn-primary">💾 Salvar e Reiniciar Bot</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- USERS SECTION -->
+        <section id="users-section" class="content-section">
+            <div class="section-header">
+                <h2>Gerenciamento de Usuários</h2>
+                <span class="info-text">Bloqueie ou desbloqueie usuários</span>
+            </div>
+
+            <div class="card">
+                <h3>Bloquear Usuário</h3>
+                <form action="/block" method="POST" class="block-form">
+                    <input type="text" name="userId" placeholder="ID do usuário" required>
+                    <button type="submit" class="btn btn-danger">🚫 Bloquear</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Usuários Bloqueados</h3>
+                <div id="blocked-users-list" class="blocked-users-grid">
+                    <!-- Usuários bloqueados -->
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
+
+        ws.onopen = () => {
+            console.log('WebSocket conectado');
+            updateConnectionIndicator(true);
+        };
+
+        ws.onerror = (error) => {
+            console.error('Erro no WebSocket:', error);
+            updateConnectionIndicator(false);
+        };
+
+        ws.onclose = () => {
+            console.log('WebSocket desconectado');
+            updateConnectionIndicator(false);
+        };
+
+        ws.onmessage = (event) => {
+            const { type, payload } = JSON.parse(event.data);
+            if (type === 'UPDATE_STATE') {
+                updateDashboard(payload);
+            }
+        };
+
+        function updateConnectionIndicator(connected) {
+            const indicator = document.getElementById('connection-indicator');
+            if (connected) {
+                indicator.className = 'connection-indicator connected';
+                indicator.innerHTML = '<span class="dot"></span><span>Conectado</span>';
+            } else {
+                indicator.className = 'connection-indicator disconnected';
+                indicator.innerHTML = '<span class="dot"></span><span>Desconectado</span>';
+            }
+        }
+
+        function updateDashboard(data) {
+            // Atualiza status do bot
+            document.getElementById('bot-status').textContent = data.botStatus.isReady ? 'Online' : 'Offline';
+            document.getElementById('bot-status').className = 'stat-value ' + (data.botStatus.isReady ? 'status-online' : 'status-offline');
+            document.getElementById('bot-user').textContent = data.botStatus.userTag || 'N/A';
+            document.getElementById('bot-servers').textContent = data.botStatus.serverCount || 0;
+            document.getElementById('bot-uptime').textContent = data.botStatus.uptime || 'N/A';
+
+            // Atualiza status do MCP
+            updateMcpStatus(data.mcpStatus || {});
+
+            // Atualiza configuração do modelo
+            updateModelConfig(data.botConfig || {});
+
+            // Atualiza ferramentas
+            updateTools(data.tools || []);
+
+            // Atualiza logs de interação
+            updateInteractionLogs(data.interactionLogs || []);
+
+            // Atualiza logs do sistema
+            updateSystemLogs(data.systemLogs || []);
+
+            // Atualiza usuários bloqueados
+            updateBlockedUsers(data.blockedUsers || []);
+        }
+
+        function updateMcpStatus(mcpStatus) {
+            // Armazena o status do MCP para uso em outras funções
+            window.lastMcpStatus = mcpStatus;
+
+            const statusElement = document.getElementById('mcp-status');
+            const toolsCount = document.getElementById('mcp-tools-count');
+            const toolsEnabled = document.getElementById('mcp-tools-enabled');
+            const reconnectAttempts = document.getElementById('mcp-reconnect-attempts');
+            const reconnectInfo = document.getElementById('mcp-reconnect-info');
+
+            if (mcpStatus.connected) {
+                statusElement.className = 'mcp-status-indicator connected';
+                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">✅ Conectado</span>';
+                reconnectInfo.style.display = 'none';
+            } else if (mcpStatus.isConnecting) {
+                statusElement.className = 'mcp-status-indicator connecting';
+                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">🔄 Conectando...</span>';
+                reconnectInfo.style.display = 'block';
+            } else {
+                statusElement.className = 'mcp-status-indicator disconnected';
+                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">❌ Desconectado</span>';
+                if (mcpStatus.reconnectAttempts > 0) {
+                    reconnectInfo.style.display = 'block';
+                }
+            }
+
+            // Conta quantas tools estão disponíveis e habilitadas
+            const enabledCount = (mcpStatus.tools || []).filter(t => t.enabled).length;
+            toolsCount.textContent = mcpStatus.totalTools || 0;
+            toolsEnabled.textContent = enabledCount;
+            reconnectAttempts.textContent = mcpStatus.reconnectAttempts || 0;
+        }
+
+        function updateModelConfig(config) {
+            if (!config.model) return;
+
+            // Armazena config para comparação
+            window.lastBotConfig = config;
+
+            // Atualiza seletor de modelos
+            const modelSelect = document.getElementById('model-select');
+            modelSelect.innerHTML = (config.availableModels || []).map(model =>
+                `<option value="${model}" ${model === config.model ? 'selected' : ''}>${model}</option>`
+            ).join('');
+
+            // Atualiza informações
+            document.getElementById('current-model').textContent = config.model;
+            document.getElementById('models-last-update').textContent =
+                config.lastModelsUpdate ? new Date(config.lastModelsUpdate).toLocaleString('pt-BR') : 'Nunca';
+
+            // Esconde o botão de reiniciar se não houver mudança
+            document.getElementById('restart-bot-btn').style.display = 'none';
+        }
+
+        async function changeModel(model) {
+            if (!confirm(`Alterar modelo para ${model}?\n\nRecomenda-se reiniciar o bot após a alteração.`)) {
+                // Reverte seleção
+                updateModelConfig(window.lastBotConfig || {});
+                return;
+            }
+
+            try {
+                const response = await fetch('/model/set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    // Mostra o botão de reiniciar
+                    document.getElementById('restart-bot-btn').style.display = 'inline-block';
+                } else {
+                    console.error('Erro ao alterar modelo:', result.error);
+                    alert('Erro ao alterar modelo!');
+                }
+            } catch (error) {
+                console.error('Erro ao alterar modelo:', error);
+                alert('Erro ao alterar modelo!');
+            }
+        }
+
+        async function restartBotAfterModelChange() {
+            if (!confirm('Deseja reiniciar o bot para aplicar o novo modelo?')) {
+                return;
+            }
+
+            try {
+                // Usa o mesmo endpoint de controle do bot
+                const response = await fetch('/bot-control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=restart'
+                });
+
+                if (response.ok) {
+                    alert('Bot reiniciando...');
+                    // Esconde o botão
+                    document.getElementById('restart-bot-btn').style.display = 'none';
+                } else {
+                    alert('Erro ao reiniciar o bot!');
+                }
+            } catch (error) {
+                console.error('Erro ao reiniciar bot:', error);
+                alert('Erro ao reiniciar o bot!');
+            }
+        }
+
+        async function refreshModels() {
+            try {
+                const response = await fetch('/model/refresh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(`${result.models.length} modelos atualizados!`);
+                } else {
+                    console.error('Erro ao atualizar modelos:', result.error);
+                    alert('Erro ao atualizar modelos!');
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar modelos:', error);
+                alert('Erro ao atualizar modelos!');
+            }
+        }
+
+        function updateTools(tools) {
+            const container = document.getElementById('tools-container');
+            document.getElementById('tools-count').textContent = `${tools.length} ferramentas`;
+
+            if (tools.length === 0) {
+                container.innerHTML = '<div class="empty-state">Nenhuma ferramenta disponível</div>';
+                return;
+            }
+
+            // Obtém a lista de tools online do MCP
+            const mcpTools = window.lastMcpStatus?.tools || [];
+            const onlineToolNames = new Set(mcpTools.map(t => t.name));
+
+            container.innerHTML = tools.map(tool => {
+                const successRate = tool.executionCount > 0
+                    ? ((tool.executionCount - tool.errorCount) / tool.executionCount * 100).toFixed(1)
+                    : 100;
+
+                const isOnline = onlineToolNames.has(tool.name);
+                const statusBadge = isOnline
+                    ? '<span class="tool-status-badge online">🟢 Online</span>'
+                    : '<span class="tool-status-badge offline">🔴 Offline</span>';
+
+                return `
+                    <div class="tool-card ${tool.enabled ? 'enabled' : 'disabled'} ${isOnline ? 'tool-online' : 'tool-offline'}">
+                        <div class="tool-header">
+                            <div class="tool-title-wrapper">
+                                <h4>${tool.name}</h4>
+                                ${statusBadge}
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" ${tool.enabled ? 'checked' : ''}
+                                       onchange="toggleTool('${tool.name}', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <p class="tool-description">${tool.description || 'Sem descrição'}</p>
+                        <div class="tool-stats">
+                            <div class="stat">
+                                <span class="stat-label">Execuções</span>
+                                <span class="stat-value">${tool.executionCount}</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Erros</span>
+                                <span class="stat-value">${tool.errorCount}</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Taxa de Sucesso</span>
+                                <span class="stat-value">${successRate}%</span>
+                            </div>
+                        </div>
+                        ${tool.lastUsed ? `<div class="tool-last-used">Último uso: ${new Date(tool.lastUsed).toLocaleString('pt-BR')}</div>` : ''}
+                        <button onclick="resetToolStats('${tool.name}')" class="btn-small btn-secondary">
+                            🔄 Resetar Estatísticas
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateInteractionLogs(logs) {
+            const container = document.getElementById('interaction-logs-list');
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="empty-state">Nenhuma interação registrada</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => `
+                <div class="log-card interaction">
+                    <div class="log-header">
+                        <img src="${log.author.avatarURL || 'https://cdn.discordapp.com/embed/avatars/0.png'}"
+                             alt="Avatar" class="avatar">
+                        <div class="user-info">
+                            <strong>${escapeHTML(log.author.tag)}</strong>
+                            <span class="user-meta">${log.author.id} • ${log.guild ? escapeHTML(log.guild.name) : 'DM'}</span>
+                        </div>
+                        <span class="timestamp">${new Date(log.timestamp).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div class="log-content">
+                        <div class="message-block">
+                            <strong>Pergunta:</strong>
+                            <p>${escapeHTML(log.question)}</p>
+                        </div>
+                        <div class="message-block">
+                            <strong>Resposta:</strong>
+                            <p>${escapeHTML(log.answer)}</p>
+                        </div>
+                        ${log.toolsUsed.length > 0 ? `
+                            <div class="tools-used">
+                                <strong>Ferramentas:</strong>
+                                ${log.toolsUsed.map(t => `<span class="badge">${t}</span>`).join(' ')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateSystemLogs(logs) {
+            const container = document.getElementById('system-logs-list');
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="empty-state">Nenhum log de sistema</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => `
+                <div class="log-card system log-${log.level}">
+                    <div class="log-meta">
+                        <span class="log-level">${log.level}</span>
+                        <span class="timestamp">${new Date(log.timestamp).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div class="log-message">${escapeHTML(log.message)}</div>
+                </div>
+            `).join('');
+        }
+
+        function updateBlockedUsers(users) {
+            const container = document.getElementById('blocked-users-list');
+
+            if (users.length === 0) {
+                container.innerHTML = '<div class="empty-state">Nenhum usuário bloqueado</div>';
+                return;
+            }
+
+            container.innerHTML = users.map(user => `
+                <div class="blocked-user-card">
+                    <div class="user-info">
+                        <strong>${escapeHTML(user.tag)}</strong>
+                        <span class="user-id">${user.id}</span>
+                    </div>
+                    <form action="/unblock" method="POST" style="margin: 0;">
+                        <input type="hidden" name="userId" value="${user.id}">
+                        <button type="submit" class="btn-small btn-danger">Desbloquear</button>
+                    </form>
+                </div>
+            `).join('');
+        }
+
+        async function toggleTool(toolName, enabled) {
+            try {
+                const response = await fetch('/tool/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ toolName, enabled: enabled.toString() })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    console.error('Erro ao alternar tool:', result.error);
+                }
+            } catch (error) {
+                console.error('Erro ao alternar tool:', error);
+            }
+        }
+
+        async function resetToolStats(toolName) {
+            if (!confirm(`Resetar estatísticas da ferramenta ${toolName}?`)) return;
+
+            try {
+                const response = await fetch('/tool/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ toolName })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    console.error('Erro ao resetar estatísticas:', result.error);
+                }
+            } catch (error) {
+                console.error('Erro ao resetar estatísticas:', error);
+            }
+        }
+
+        function escapeHTML(str) {
+            if (typeof str !== 'string') return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Navegação entre seções
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = item.dataset.section;
+
+                // Atualiza nav items
+                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+
+                // Atualiza sections
+                document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active'));
+                document.getElementById(`${section}-section`).classList.add('active');
+            });
+        });
+
+        // Tabs de logs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+
+                // Atualiza tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Atualiza conteúdo
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

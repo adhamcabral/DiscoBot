@@ -1,0 +1,47 @@
+[
+  {
+    "name": "search_web",
+    "enabled": true,
+    "description": "Pesquisa a web para notícias, últimas notícias, fatos atuais/recentes, preços, cotações, versões, agendas e pesquisas gerais."
+  },
+  {
+    "name": "summarize_url",
+    "enabled": true,
+    "description": "Extrai conteúdo de uma URL pública para resumo em português."
+  },
+  {
+    "name": "analyze_image",
+    "enabled": true,
+    "description": "Analisa imagem/foto/print/anexo quando o pedido atual é claramente visual. Não usar para notícias ou pesquisa geral."
+  },
+  {
+    "name": "visual_search_image",
+    "enabled": true,
+    "description": "Identifica com busca web algo visível numa imagem. Não usar para últimas notícias ou fatos recentes sem referência visual clara."
+  },
+  {
+    "name": "create_image",
+    "enabled": true,
+    "description": "Cria uma imagem com streaming de prévias parciais em tempo real."
+  },
+  {
+    "name": "edit_image",
+    "enabled": true,
+    "description": "Edita ou estende imagens usando IA com streaming de prévias parciais em tempo real."
+  },
+  {
+    "name": "get_image_result",
+    "enabled": true,
+    "description": "Obtém o resultado de uma operação assíncrona de imagem."
+  },
+  {
+    "name": "sticker_emoji_creator",
+    "enabled": true,
+    "description": "Transforma imagem em emoji ou sticker estático otimizado para Discord."
+  },
+  {
+    "name": "create_sticker_emoji",
+    "enabled": true,
+    "description": "Cria do zero emoji ou sticker com fundo transparente otimizado para Discord."
+  }
+]
