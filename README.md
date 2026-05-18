@@ -7,6 +7,7 @@ An MCP (Model Context Protocol) Discord bot, which has several tools. including:
 - Image generation
 - Sticker generation
 - Web scraping
+- Schedule Reminder
 
 
 
