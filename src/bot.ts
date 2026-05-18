@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import { File } from 'node:buffer';
 import { files, ensureRuntimeDirs } from './utils/paths.js';
 import { Events } from 'discord.js';
+import { startReminderScheduler, stopReminderScheduler } from './discord/reminderScheduler.js';
 
 // Polyfill para a classe File
 if (!globalThis.File) {
@@ -41,6 +42,7 @@ async function startBot() {
 
     client.once(Events.ClientReady, (readyClient) => {
       logger.info(`${readyClient.user.tag} pronto`);
+      startReminderScheduler(client);
 
       // Escreve o status a cada 30 segundos
       setInterval(writeStatus, 30000);
@@ -60,6 +62,7 @@ async function startBot() {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Desligando bot...');
+  stopReminderScheduler();
   await shutdownMcpClient();
   client.destroy();
   process.exit(0);
@@ -67,6 +70,7 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   logger.info('Desligando bot...');
+  stopReminderScheduler();
   await shutdownMcpClient();
   client.destroy();
   process.exit(0);

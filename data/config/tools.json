@@ -1,5 +1,15 @@
 [
   {
+    "name": "read_discord_context",
+    "enabled": true,
+    "description": "Busca mensagens anteriores no canal atual do Discord para recuperar contexto além das últimas mensagens já enviadas ao modelo."
+  },
+  {
+    "name": "schedule_reminder",
+    "enabled": true,
+    "description": "Agenda, lista ou cancela lembretes persistentes do usuário no Discord."
+  },
+  {
     "name": "search_web",
     "enabled": true,
     "description": "Pesquisa a web para notícias, últimas notícias, fatos atuais/recentes, preços, cotações, versões, agendas e pesquisas gerais."

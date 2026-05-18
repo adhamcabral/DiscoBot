@@ -2,7 +2,15 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
 import { getSystemLogs, getInteractionLogs, logger } from '../utils/logger.js';
-import { getBlockedUsers, addBlockedUser, removeBlockedUser } from '../utils/database.js';
+import {
+    getBlockedUsers,
+    addBlockedUser,
+    removeBlockedUser,
+    listReminders,
+    cancelReminderById,
+    type ReminderRecord,
+    type ReminderStatus,
+} from '../utils/database.js';
 import { getAllTools, setToolEnabled, resetToolStats } from '../utils/toolsManager.js';
 import { getConfig, setCurrentModel, fetchAvailableModels } from '../utils/configManager.js';
 import { getMcpStatus } from '../mcp/client.js';
@@ -19,6 +27,7 @@ const statusPath = files.status;
 const promptPath = files.systemPrompt;
 const systemLogPath = files.systemLog;
 const interactionLogPath = files.interactionLog;
+const remindersSignalPath = files.remindersSignal;
 
 web.set('view engine', 'ejs');
 web.set('views', path.join(process.cwd(), 'views'));
@@ -27,17 +36,53 @@ web.use(express.urlencoded({ extended: true }));
 web.use(express.json());
 
 async function getFullState() {
-    const [botStatus, systemLogs, interactionLogs, blockedUserIds, tools, botConfig, mcpStatus] = await Promise.all([
+    const [botStatus, systemLogs, interactionLogs, blockedUserIds, tools, botConfig, mcpStatus, reminders] = await Promise.all([
         getBotStatus(),
         getSystemLogs(),
         getInteractionLogs(),
         getBlockedUsers(),
         getAllTools(),
         Promise.resolve(getConfig()),
-        Promise.resolve(getMcpStatus())
+        Promise.resolve(getMcpStatus()),
+        getReminderPanelState(),
     ]);
     const blockedUsers = blockedUserIds.map(id => ({ id, tag: id }));
-    return { botStatus, systemLogs, interactionLogs, blockedUsers, tools, botConfig, mcpStatus };
+    return { botStatus, systemLogs, interactionLogs, blockedUsers, tools, botConfig, mcpStatus, reminders };
+}
+
+function formatReminderForPanel(reminder: ReminderRecord) {
+    const timezone = reminder.timezone
+        || process.env.BOT_TIMEZONE
+        || process.env.TZ
+        || Intl.DateTimeFormat().resolvedOptions().timeZone
+        || 'America/Sao_Paulo';
+
+    let localDueAt = reminder.dueAt;
+    try {
+        localDueAt = new Intl.DateTimeFormat('pt-BR', {
+            dateStyle: 'short',
+            timeStyle: 'short',
+            timeZone: timezone,
+        }).format(new Date(reminder.dueAt));
+    } catch {
+        localDueAt = new Date(reminder.dueAt).toLocaleString('pt-BR');
+    }
+
+    return {
+        ...reminder,
+        localDueAt,
+        timezone,
+    };
+}
+
+async function getReminderPanelState() {
+    const items = (await listReminders({ limit: 100 })).map(formatReminderForPanel);
+    const counts = items.reduce((acc, reminder) => {
+        acc[reminder.status] = (acc[reminder.status] || 0) + 1;
+        return acc;
+    }, {} as Record<ReminderStatus, number>);
+
+    return { items, counts };
 }
 
 async function broadcastState() {
@@ -66,7 +111,7 @@ async function watchRuntimeFile(filePath: string) {
 
 void (async () => {
     await ensureRuntimeDirs();
-    await Promise.all([statusPath, systemLogPath, interactionLogPath].map(watchRuntimeFile));
+    await Promise.all([statusPath, systemLogPath, interactionLogPath, remindersSignalPath].map(watchRuntimeFile));
 })();
 
 
@@ -122,6 +167,23 @@ web.post('/unblock', async (req, res) => {
   const { userId } = req.body;
   if (userId) await removeBlockedUser(userId);
   res.redirect('/');
+});
+
+web.post('/reminder/cancel', async (req, res) => {
+  const { reminderId } = req.body;
+  if (!reminderId || typeof reminderId !== 'string') {
+    res.status(400).json({ success: false, error: 'reminderId é obrigatório' });
+    return;
+  }
+
+  try {
+    const reminder = await cancelReminderById(reminderId);
+    await broadcastState();
+    res.json({ success: Boolean(reminder), reminder: reminder ? formatReminderForPanel(reminder) : null });
+  } catch (error) {
+    logger.error(`Erro ao cancelar lembrete ${reminderId}:`, error);
+    res.status(500).json({ success: false, error: String(error) });
+  }
 });
 
 web.post('/save-prompt', async (req, res) => {

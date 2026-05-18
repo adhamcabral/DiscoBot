@@ -23,6 +23,28 @@ export async function initializeAi() {
   await updateModelsIfNeeded();
 }
 
+function getRuntimeContext() {
+  const now = new Date();
+  const timezone = process.env.BOT_TIMEZONE
+    || process.env.TZ
+    || Intl.DateTimeFormat().resolvedOptions().timeZone
+    || 'America/Sao_Paulo';
+  const localNow = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'full',
+    timeStyle: 'medium',
+    timeZone: timezone,
+  }).format(now);
+
+  return [
+    '## Contexto de runtime',
+    `Agora em UTC ISO: ${now.toISOString()}`,
+    `Agora no timezone local do bot (${timezone}): ${localNow}`,
+    `Timezone padrão para o usuário: ${timezone}`,
+    'Para lembretes relativos como "em 5 minutos", "daqui 2 horas" ou "em 3 dias", prefira chamar schedule_reminder com delaySeconds em vez de calcular dueAt manualmente.',
+    'Para lembretes com data/hora absoluta, use dueAt em ISO 8601 com offset/timezone explícito. Se faltar data, hora ou texto, peça esclarecimento antes de agendar.',
+  ].join('\n');
+}
+
 export async function getNextAction(
   messages: ChatCompletionMessageParam[],
   currentUser: { id: string; name: string },
@@ -37,7 +59,7 @@ export async function getNextAction(
     messages: [
       {
         role: 'system',
-        content: populatedPrompt,
+        content: `${populatedPrompt}\n\n${getRuntimeContext()}`,
       },
       ...messages,
     ],

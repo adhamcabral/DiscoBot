@@ -1,11 +1,19 @@
+import type { Message } from 'discord.js';
 import { callMcpTool } from '../mcp/client.js';
 import { logger } from '../utils/logger.js';
-import type { ImageCandidate } from './types.js';
+import { readDiscordContext } from './discordContextTool.js';
+import { scheduleReminder } from './reminderTool.js';
+import type { ImageCandidate, WritableTextChannel } from './types.js';
 
 type ErrorTracker = {
   errorCount: number;
   lastErrors: string[];
   timestamp: number;
+};
+
+type ToolExecutionContext = {
+  channel: WritableTextChannel;
+  triggerMessage: Message;
 };
 
 const errorTracking = new Map<string, ErrorTracker>();
@@ -56,6 +64,16 @@ function summarizeToolResult(toolName: string, resultText: string) {
         ? parsed.results.slice(0, 3).map((result: any) => result.title).join(' | ')
         : '';
       return `search_web: query=${query}; top=${topResults || 'n/a'}`;
+    }
+
+    if (toolName === 'read_discord_context') {
+      return `read_discord_context: scanned=${parsed.scannedCount || 0}; returned=${parsed.returnedCount || 0}; query=${parsed.query || 'n/a'}`;
+    }
+
+    if (toolName === 'schedule_reminder') {
+      const action = parsed.action || 'create';
+      const reminderId = parsed.reminder?.id || parsed.reminderId || 'n/a';
+      return `schedule_reminder: action=${action}; success=${Boolean(parsed.success)}; reminder=${reminderId}`;
     }
 
     return `${toolName}: ${resultText.slice(0, 500)}`;
@@ -120,11 +138,32 @@ function formatToolError(toolName: string, error: unknown) {
   return `[ERRO NA FERRAMENTA] A ferramenta ${toolName} falhou com o erro: "${errorMessage}". Você pode tentar novamente com parâmetros diferentes, usar outra abordagem, ou informar o usuário sobre a falha. Analise o erro e decida a melhor ação.`;
 }
 
-export async function executeToolCall(toolName: string, functionArgs: Record<string, unknown>, imageCandidates: ImageCandidate[]) {
+export async function executeToolCall(
+  toolName: string,
+  functionArgs: Record<string, unknown>,
+  imageCandidates: ImageCandidate[],
+  context?: ToolExecutionContext,
+) {
   try {
-    const result = IMAGE_URL_TOOL_NAMES.has(toolName)
-      ? await callImageUrlToolWithFallback(toolName, functionArgs, imageCandidates)
-      : await callMcpTool(toolName, functionArgs);
+    let result: string;
+
+    if (toolName === 'read_discord_context') {
+      if (!context) {
+        throw new Error('Contexto do Discord indisponível para read_discord_context.');
+      }
+
+      result = await readDiscordContext(context.channel, context.triggerMessage, functionArgs);
+    } else if (toolName === 'schedule_reminder') {
+      if (!context) {
+        throw new Error('Contexto do Discord indisponível para schedule_reminder.');
+      }
+
+      result = await scheduleReminder(context.channel, context.triggerMessage, functionArgs);
+    } else {
+      result = IMAGE_URL_TOOL_NAMES.has(toolName)
+        ? await callImageUrlToolWithFallback(toolName, functionArgs, imageCandidates)
+        : await callMcpTool(toolName, functionArgs);
+    }
 
     return {
       ok: true as const,

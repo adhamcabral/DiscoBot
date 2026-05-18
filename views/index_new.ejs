@@ -3,33 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Controle do Bot</title>
+    <title>DiscoBot Admin</title>
     <link rel="stylesheet" href="/css/style_new.css">
 </head>
 <body>
     <div class="sidebar">
         <div class="logo">
-            <h1>🤖 Bot Control</h1>
+            <h1>DiscoBot</h1>
+            <span>Admin Console</span>
         </div>
         <nav class="nav">
             <a href="#status" class="nav-item active" data-section="status">
-                <span class="icon">📊</span>
+                <span class="icon">ST</span>
                 <span class="label">Status</span>
             </a>
             <a href="#tools" class="nav-item" data-section="tools">
-                <span class="icon">🛠️</span>
+                <span class="icon">TL</span>
                 <span class="label">Ferramentas</span>
             </a>
+            <a href="#reminders" class="nav-item" data-section="reminders">
+                <span class="icon">RM</span>
+                <span class="label">Lembretes</span>
+            </a>
             <a href="#logs" class="nav-item" data-section="logs">
-                <span class="icon">📝</span>
+                <span class="icon">LG</span>
                 <span class="label">Logs</span>
             </a>
             <a href="#personality" class="nav-item" data-section="personality">
-                <span class="icon">🧠</span>
-                <span class="label">Personalidade</span>
+                <span class="icon">PR</span>
+                <span class="label">Prompt</span>
             </a>
             <a href="#users" class="nav-item" data-section="users">
-                <span class="icon">👥</span>
+                <span class="icon">US</span>
                 <span class="label">Usuários</span>
             </a>
         </nav>
@@ -39,7 +44,7 @@
         <!-- STATUS SECTION -->
         <section id="status-section" class="content-section active">
             <div class="section-header">
-                <h2>Status do Bot</h2>
+                <h2>Status</h2>
                 <div id="connection-indicator" class="connection-indicator">
                     <span class="dot"></span>
                     <span>Conectado</span>
@@ -48,28 +53,28 @@
 
             <div class="cards-grid">
                 <div class="stat-card">
-                    <div class="stat-icon">🟢</div>
+                    <div class="stat-icon">01</div>
                     <div class="stat-content">
                         <div class="stat-label">Status</div>
                         <div id="bot-status" class="stat-value">Offline</div>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">👤</div>
+                    <div class="stat-icon">02</div>
                     <div class="stat-content">
                         <div class="stat-label">Usuário</div>
                         <div id="bot-user" class="stat-value">N/A</div>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">🏠</div>
+                    <div class="stat-icon">03</div>
                     <div class="stat-content">
                         <div class="stat-label">Servidores</div>
                         <div id="bot-servers" class="stat-value">0</div>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-icon">04</div>
                     <div class="stat-content">
                         <div class="stat-label">Uptime</div>
                         <div id="bot-uptime" class="stat-value">N/A</div>
@@ -78,19 +83,19 @@
             </div>
 
             <div class="card">
-                <h3>Controles do Bot</h3>
+                <h3>Controles</h3>
                 <div class="control-buttons-horizontal">
                     <form action="/bot-control" method="POST" style="margin: 0;">
                         <input type="hidden" name="action" value="start">
-                        <button type="submit" class="btn btn-success">▶️ Iniciar</button>
+                        <button type="submit" class="btn btn-success">Iniciar</button>
                     </form>
                     <form action="/bot-control" method="POST" style="margin: 0;">
                         <input type="hidden" name="action" value="restart">
-                        <button type="submit" class="btn btn-warning">🔄 Reiniciar</button>
+                        <button type="submit" class="btn btn-warning">Reiniciar</button>
                     </form>
                     <form action="/bot-control" method="POST" style="margin: 0;">
                         <input type="hidden" name="action" value="stop">
-                        <button type="submit" class="btn btn-danger">⏹️ Parar</button>
+                        <button type="submit" class="btn btn-danger">Parar</button>
                     </form>
                 </div>
             </div>
@@ -99,7 +104,7 @@
         <!-- TOOLS SECTION -->
         <section id="tools-section" class="content-section">
             <div class="section-header">
-                <h2>Gerenciamento de Ferramentas</h2>
+                <h2>Ferramentas</h2>
                 <span class="badge" id="tools-count">0 ferramentas</span>
             </div>
 
@@ -111,9 +116,9 @@
                         <span class="status-text">Desconectado</span>
                     </div>
                     <div class="mcp-info">
-                        <p><strong>Tools Server:</strong> <span id="mcp-server-url">http://localhost:3001</span></p>
-                        <p><strong>Tools disponíveis:</strong> <span id="mcp-tools-count">0</span></p>
-                        <p><strong>Tools habilitadas:</strong> <span id="mcp-tools-enabled">0</span></p>
+                        <p><strong>Servidor:</strong> <span id="mcp-server-url">stdio local</span></p>
+                        <p><strong>Disponíveis:</strong> <span id="mcp-tools-count">0</span></p>
+                        <p><strong>Habilitadas:</strong> <span id="mcp-tools-enabled">0</span></p>
                         <p id="mcp-reconnect-info" style="display: none;"><strong>Tentativas de reconexão:</strong> <span id="mcp-reconnect-attempts">0</span></p>
                     </div>
                 </div>
@@ -125,8 +130,8 @@
                     <select id="model-select" onchange="changeModel(this.value)">
                         <!-- Modelos serão preenchidos via JavaScript -->
                     </select>
-                    <button onclick="refreshModels()" class="btn-small btn-secondary">🔄 Atualizar Lista</button>
-                    <button onclick="restartBotAfterModelChange()" class="btn-small btn-warning" id="restart-bot-btn" style="display: none;">🔄 Reiniciar Bot</button>
+                    <button onclick="refreshModels()" class="btn-small btn-secondary">Atualizar lista</button>
+                    <button onclick="restartBotAfterModelChange()" class="btn-small btn-warning" id="restart-bot-btn" style="display: none;">Reiniciar bot</button>
                 </div>
                 <p class="info-text model-info">
                     <strong>Modelo atual:</strong> <span id="current-model">Carregando...</span><br>
@@ -136,6 +141,54 @@
 
             <div id="tools-container" class="tools-grid">
                 <!-- Ferramentas serão inseridas aqui -->
+            </div>
+        </section>
+
+        <!-- REMINDERS SECTION -->
+        <section id="reminders-section" class="content-section">
+            <div class="section-header">
+                <h2>Lembretes</h2>
+                <span class="badge" id="reminders-count">0 lembretes</span>
+            </div>
+
+            <div class="cards-grid reminder-stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">P</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Pendentes</div>
+                        <div id="reminders-pending-count" class="stat-value">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">S</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Enviados</div>
+                        <div id="reminders-sent-count" class="stat-value">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">X</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Cancelados/Falhos</div>
+                        <div id="reminders-inactive-count" class="stat-value">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="reminder-toolbar">
+                    <label for="reminder-status-filter">Status</label>
+                    <select id="reminder-status-filter" onchange="renderReminders()">
+                        <option value="all">Todos</option>
+                        <option value="pending" selected>Pendentes</option>
+                        <option value="sent">Enviados</option>
+                        <option value="cancelled">Cancelados</option>
+                        <option value="failed">Falhos</option>
+                    </select>
+                </div>
+                <div id="reminders-list" class="reminders-list">
+                    <!-- Lembretes -->
+                </div>
             </div>
         </section>
 
@@ -165,14 +218,14 @@
         <!-- PERSONALITY SECTION -->
         <section id="personality-section" class="content-section">
             <div class="section-header">
-                <h2>Personalidade do Bot</h2>
-                <span class="info-text">Defina como o bot deve se comportar e responder</span>
+                <h2>Prompt do Sistema</h2>
+                <span class="info-text">Controle as instruções usadas pelo bot</span>
             </div>
 
             <div class="card">
                 <form id="prompt-editor-form" action="/save-prompt" method="POST">
-                    <textarea name="prompt" id="prompt-textarea" placeholder="Escreva a personalidade do bot aqui..."><%= promptContent %></textarea>
-                    <button type="submit" class="btn btn-primary">💾 Salvar e Reiniciar Bot</button>
+                    <textarea name="prompt" id="prompt-textarea" placeholder="Escreva as instruções do sistema aqui..."><%= promptContent %></textarea>
+                    <button type="submit" class="btn btn-primary">Salvar e reiniciar bot</button>
                 </form>
             </div>
         </section>
@@ -180,7 +233,7 @@
         <!-- USERS SECTION -->
         <section id="users-section" class="content-section">
             <div class="section-header">
-                <h2>Gerenciamento de Usuários</h2>
+                <h2>Usuários</h2>
                 <span class="info-text">Bloqueie ou desbloqueie usuários</span>
             </div>
 
@@ -188,7 +241,7 @@
                 <h3>Bloquear Usuário</h3>
                 <form action="/block" method="POST" class="block-form">
                     <input type="text" name="userId" placeholder="ID do usuário" required>
-                    <button type="submit" class="btn btn-danger">🚫 Bloquear</button>
+                    <button type="submit" class="btn btn-danger">Bloquear</button>
                 </form>
             </div>
 
@@ -263,6 +316,9 @@
 
             // Atualiza usuários bloqueados
             updateBlockedUsers(data.blockedUsers || []);
+
+            // Atualiza lembretes
+            updateReminders(data.reminders || { items: [], counts: {} });
         }
 
         function updateMcpStatus(mcpStatus) {
@@ -277,15 +333,15 @@
 
             if (mcpStatus.connected) {
                 statusElement.className = 'mcp-status-indicator connected';
-                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">✅ Conectado</span>';
+                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">Conectado</span>';
                 reconnectInfo.style.display = 'none';
             } else if (mcpStatus.isConnecting) {
                 statusElement.className = 'mcp-status-indicator connecting';
-                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">🔄 Conectando...</span>';
+                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">Conectando...</span>';
                 reconnectInfo.style.display = 'block';
             } else {
                 statusElement.className = 'mcp-status-indicator disconnected';
-                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">❌ Desconectado</span>';
+                statusElement.innerHTML = '<span class="dot"></span><span class="status-text">Desconectado</span>';
                 if (mcpStatus.reconnectAttempts > 0) {
                     reconnectInfo.style.display = 'block';
                 }
@@ -411,8 +467,8 @@
 
                 const isOnline = onlineToolNames.has(tool.name);
                 const statusBadge = isOnline
-                    ? '<span class="tool-status-badge online">🟢 Online</span>'
-                    : '<span class="tool-status-badge offline">🔴 Offline</span>';
+                    ? '<span class="tool-status-badge online">Online</span>'
+                    : '<span class="tool-status-badge offline">Offline</span>';
 
                 return `
                     <div class="tool-card ${tool.enabled ? 'enabled' : 'disabled'} ${isOnline ? 'tool-online' : 'tool-offline'}">
@@ -444,7 +500,7 @@
                         </div>
                         ${tool.lastUsed ? `<div class="tool-last-used">Último uso: ${new Date(tool.lastUsed).toLocaleString('pt-BR')}</div>` : ''}
                         <button onclick="resetToolStats('${tool.name}')" class="btn-small btn-secondary">
-                            🔄 Resetar Estatísticas
+                            Resetar estatísticas
                         </button>
                     </div>
                 `;
@@ -529,6 +585,88 @@
                     </form>
                 </div>
             `).join('');
+        }
+
+        function updateReminders(remindersState) {
+            window.lastReminders = remindersState.items || [];
+            const counts = remindersState.counts || {};
+            const total = window.lastReminders.length;
+            const pending = counts.pending || 0;
+            const sent = counts.sent || 0;
+            const inactive = (counts.cancelled || 0) + (counts.failed || 0);
+
+            document.getElementById('reminders-count').textContent = `${total} lembretes`;
+            document.getElementById('reminders-pending-count').textContent = pending;
+            document.getElementById('reminders-sent-count').textContent = sent;
+            document.getElementById('reminders-inactive-count').textContent = inactive;
+
+            renderReminders();
+        }
+
+        function getReminderStatusLabel(status) {
+            const labels = {
+                pending: 'Pendente',
+                sent: 'Enviado',
+                cancelled: 'Cancelado',
+                failed: 'Falhou'
+            };
+            return labels[status] || status;
+        }
+
+        function renderReminders() {
+            const container = document.getElementById('reminders-list');
+            const statusFilter = document.getElementById('reminder-status-filter')?.value || 'pending';
+            const reminders = (window.lastReminders || []).filter(reminder =>
+                statusFilter === 'all' || reminder.status === statusFilter
+            );
+
+            if (reminders.length === 0) {
+                container.innerHTML = '<div class="empty-state">Nenhum lembrete encontrado para este filtro</div>';
+                return;
+            }
+
+            container.innerHTML = reminders.map(reminder => `
+                <div class="reminder-card reminder-${reminder.status}">
+                    <div class="reminder-main">
+                        <div class="reminder-header">
+                            <span class="reminder-status">${getReminderStatusLabel(reminder.status)}</span>
+                            <span class="timestamp">${escapeHTML(reminder.localDueAt || new Date(reminder.dueAt).toLocaleString('pt-BR'))}</span>
+                        </div>
+                        <div class="reminder-text">${escapeHTML(reminder.text)}</div>
+                        <div class="reminder-meta">
+                            <span>ID: ${escapeHTML(reminder.id)}</span>
+                            <span>Usuário: ${escapeHTML(reminder.userId)}</span>
+                            <span>Canal: ${escapeHTML(reminder.channelId)}</span>
+                            <span>Fuso: ${escapeHTML(reminder.timezone || 'N/A')}</span>
+                        </div>
+                        ${reminder.error ? `<div class="reminder-error">${escapeHTML(reminder.error)}</div>` : ''}
+                    </div>
+                    ${reminder.status === 'pending' ? `
+                        <button onclick="cancelReminder('${escapeHTML(reminder.id)}')" class="btn-small btn-danger">
+                            Cancelar
+                        </button>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function cancelReminder(reminderId) {
+            if (!confirm(`Cancelar o lembrete ${reminderId}?`)) return;
+
+            try {
+                const response = await fetch('/reminder/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reminderId })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Lembrete não encontrado ou já não está pendente.');
+                }
+            } catch (error) {
+                console.error('Erro ao cancelar lembrete:', error);
+                alert('Erro ao cancelar lembrete!');
+            }
         }
 
         async function toggleTool(toolName, enabled) {

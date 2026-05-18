@@ -59,7 +59,10 @@ export async function handleMessage(message: Message) {
         toolsUsed.push(functionName);
 
         const functionArgs = JSON.parse(toolCall.function.arguments);
-        const toolResult = await executeToolCall(functionName, functionArgs, imageCandidates);
+        const toolResult = await executeToolCall(functionName, functionArgs, imageCandidates, {
+          channel,
+          triggerMessage: message,
+        });
         if (toolResult.ok) toolDetails.push(toolResult.summary);
 
         let functionResponseContent = toolResult.result;

@@ -7,6 +7,7 @@ import { createImage, editImage, getImageResult } from './tools/imageTools.js';
 import { searchWeb, summarizeUrl } from './tools/webTools.js';
 import { createStickerEmoji, stickerEmojiCreator } from './tools/stickerEmojiTools.js';
 import { analyzeImage, visualSearchImage } from './tools/visionTools.js';
+import { readDiscordContext, scheduleReminder } from './tools/discordTools.js';
 
 if (!globalThis.File) {
   globalThis.File = File as never;
@@ -16,6 +17,34 @@ const server = new McpServer({
   name: 'discord-image-tools',
   version: '1.0.0',
 });
+
+server.tool(
+  'read_discord_context',
+  'Busca mensagens anteriores no canal atual do Discord para recuperar contexto além das últimas mensagens já enviadas ao modelo. Use quando o usuário pedir resumo do histórico, procurar algo dito antes, lembrar conversa anterior no canal, ou quando as últimas 20 mensagens não forem contexto suficiente. Não use para buscar na web.',
+  {
+    limit: z.number().min(1).max(200).default(80).describe('Quantidade máxima de mensagens anteriores a escanear no canal atual. Máximo operacional: 200.'),
+    beforeMessageId: z.string().optional().describe('ID de mensagem antes da qual buscar. Se omitido, busca antes da mensagem atual do usuário.'),
+    query: z.string().optional().describe('Filtro opcional por texto, nome de anexo, tipo de anexo ou URL de anexo. Use para procurar uma palavra/frase específica no histórico.'),
+    authorId: z.string().optional().describe('Filtro opcional por ID do autor da mensagem.'),
+    includeBotMessages: z.boolean().default(true).describe('Se false, ignora mensagens de bots.'),
+  },
+  readDiscordContext,
+);
+
+server.tool(
+  'schedule_reminder',
+  'Agenda, lista ou cancela lembretes persistentes do usuário no Discord. Os lembretes ficam salvos em SQLite e continuam pendentes se o bot desligar antes da data. Use quando o usuário pedir para lembrar/avisar/notificar em uma data ou tempo futuro, ou para ver/cancelar lembretes.',
+  {
+    action: z.enum(['create', 'list', 'cancel']).default('create').describe('create agenda um lembrete; list lista lembretes pendentes do usuário; cancel cancela um lembrete pelo ID.'),
+    text: z.string().optional().describe('Texto do lembrete. Obrigatório para action=create.'),
+    dueAt: z.string().optional().describe('Data/hora absoluta do lembrete em ISO 8601 com timezone, por exemplo 2026-05-17T18:30:00-03:00. Use para horários absolutos.'),
+    delaySeconds: z.number().min(1).max(31622400).optional().describe('Atraso relativo em segundos. Prefira isto para pedidos como "em 5 minutos", "daqui 2 horas" ou "em 3 dias".'),
+    timezone: z.string().optional().describe('Timezone IANA usado para explicar/listar o horário, por exemplo America/Sao_Paulo. Opcional; padrão do bot é usado se omitido.'),
+    reminderId: z.string().optional().describe('ID do lembrete. Use para action=cancel quando informado. Se omitido e houver exatamente um lembrete pendente do usuário, a ferramenta cancela esse único lembrete; se houver vários, ela pedirá o ID.'),
+    limit: z.number().min(1).max(50).default(20).describe('Quantidade máxima de lembretes a listar para action=list.'),
+  },
+  scheduleReminder,
+);
 
 server.tool(
   'search_web',

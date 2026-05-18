@@ -15,6 +15,7 @@ export const files = {
   legacyDatabaseJson: path.join(statePath, 'db.json'),
   database: path.join(statePath, 'bot.sqlite'),
   status: path.join(statePath, 'status.json'),
+  remindersSignal: path.join(statePath, 'reminders.signal.json'),
   systemLog: path.join(logsPath, 'system.log'),
   interactionLog: path.join(logsPath, 'interaction.log'),
 };
