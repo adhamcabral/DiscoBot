@@ -7,13 +7,16 @@ import { getSafeWritableChannel } from './channelUtils.js';
 import { buildConversationContext } from './messageContext.js';
 import { replyLongMessage, sendLongMessage } from './messageSender.js';
 import { handleDirectMediaToolResult } from './mediaToolHandler.js';
+import { recordResearchMemory } from './researchMemory.js';
 import { executeToolCall, isDirectMediaTool } from './toolExecutor.js';
+import { startToolProgress } from './toolProgress.js';
 
 const MAX_TOOL_LOOPS = 10;
 const AI_TIMEOUT_MS = 900000;
 
 export async function handleMessage(message: Message) {
   let typingInterval: NodeJS.Timeout | null = null;
+  const progressHandles: Array<{ dismiss: () => Promise<void> }> = [];
 
   try {
     const channel = await getSafeWritableChannel(message.channel);
@@ -38,6 +41,7 @@ export async function handleMessage(message: Message) {
 
       if (!nextAction.tool_calls) {
         if (nextAction.content && !imageSent) {
+          await Promise.all(progressHandles.map(progress => progress.dismiss()));
           await replyLongMessage(message, channel, nextAction.content);
           await logInteraction(message, nextAction.content, toolsUsed, toolDetails);
         }
@@ -59,11 +63,22 @@ export async function handleMessage(message: Message) {
         toolsUsed.push(functionName);
 
         const functionArgs = JSON.parse(toolCall.function.arguments);
+        const progress = await startToolProgress(channel, functionName, functionArgs);
+        if (progress) progressHandles.push(progress);
         const toolResult = await executeToolCall(functionName, functionArgs, imageCandidates, {
           channel,
           triggerMessage: message,
         });
+        await progress?.complete(toolResult.ok, toolResult.result);
         if (toolResult.ok) toolDetails.push(toolResult.summary);
+        if (toolResult.ok) {
+          recordResearchMemory({
+            channelId: channel.id,
+            sourceMessageId: message.id,
+            toolName: functionName,
+            resultText: toolResult.result,
+          });
+        }
 
         let functionResponseContent = toolResult.result;
         const mediaResult = await handleDirectMediaToolResult({
@@ -93,5 +108,6 @@ export async function handleMessage(message: Message) {
     }
   } finally {
     if (typingInterval) clearInterval(typingInterval);
+    await Promise.all(progressHandles.map(progress => progress.dismiss()));
   }
 }

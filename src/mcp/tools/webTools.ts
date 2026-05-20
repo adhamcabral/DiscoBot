@@ -1,5 +1,6 @@
 import dns from 'dns/promises';
 import net from 'net';
+import OpenAI from 'openai';
 
 type SearchResult = {
   title: string;
@@ -7,6 +8,39 @@ type SearchResult = {
   snippet: string;
   source?: string;
 };
+
+type ReadablePage = {
+  ok: true;
+  url: string;
+  title: string;
+  description: string;
+  siteName?: string;
+  author?: string;
+  publishedAt?: string;
+  modifiedAt?: string;
+  canonicalUrl?: string;
+  text: string;
+};
+
+type FailedPage = {
+  ok: false;
+  url: string;
+  error: string;
+};
+
+type PageResult = ReadablePage | FailedPage;
+
+type ResearchDepth = 'quick' | 'standard' | 'deep';
+
+let openai: OpenAI | null = null;
+
+function getOpenAI() {
+  openai ??= new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  return openai;
+}
 
 function jsonText(value: unknown) {
   return {
@@ -30,6 +64,51 @@ function decodeHtml(value: string) {
 function stripHtml(value: string) {
   return decodeHtml(value.replace(/<[^>]*>/g, ' '))
     .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function truncate(value: string, maxChars: number) {
+  return value.length <= maxChars ? value : `${value.slice(0, maxChars - 3)}...`;
+}
+
+function getMetaContent(html: string, names: string[]) {
+  for (const name of names) {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+      new RegExp(`<meta[^>]+(?:name|property)=["']${escapedName}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'),
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:name|property)=["']${escapedName}["'][^>]*>`, 'i'),
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) return stripHtml(match[1]);
+    }
+  }
+
+  return '';
+}
+
+function getLinkHref(html: string, rel: string) {
+  const escapedRel = rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`<link[^>]+rel=["'][^"']*${escapedRel}[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>`, 'i'),
+    new RegExp(`<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*${escapedRel}[^"']*["'][^>]*>`, 'i'),
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return decodeHtml(match[1]);
+  }
+
+  return '';
+}
+
+function normalizeWhitespace(value: string) {
+  return value
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
 
@@ -355,29 +434,53 @@ async function fetchText(url: string, maxBytes = 1_500_000) {
 
 function extractReadableContent(html: string) {
   const title = stripHtml(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '');
-  const description = stripHtml(
-    html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
-      || html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
-      || '',
-  );
+  const description = getMetaContent(html, ['description', 'og:description', 'twitter:description']);
+  const siteName = getMetaContent(html, ['og:site_name', 'application-name']);
+  const author = getMetaContent(html, ['author', 'article:author', 'parsely-author']);
+  const publishedAt = getMetaContent(html, [
+    'article:published_time',
+    'datePublished',
+    'pubdate',
+    'publishdate',
+    'DC.date.issued',
+  ]);
+  const modifiedAt = getMetaContent(html, [
+    'article:modified_time',
+    'dateModified',
+    'lastmod',
+    'og:updated_time',
+  ]);
+  const canonicalUrl = getLinkHref(html, 'canonical');
 
-  const text = stripHtml(html
+  const articleMatch = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+  const mainMatch = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
+  const sourceHtml = articleMatch?.[1] || mainMatch?.[1] || html;
+
+  const text = normalizeWhitespace(stripHtml(sourceHtml
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<form[\s\S]*?<\/form>/gi, ' ')
+    .replace(/<header[\s\S]*?<\/header>/gi, ' ')
     .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
     .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
     .replace(/<aside[\s\S]*?<\/aside>/gi, ' ')
-    .replace(/<(p|br|h[1-6]|li|article|section|div)\b/gi, '\n<$1'));
+    .replace(/<(p|br|h[1-6]|li|article|section|div|blockquote)\b/gi, '\n<$1')));
 
   return {
     title,
     description,
-    text: text.slice(0, 12000),
+    siteName,
+    author,
+    publishedAt,
+    modifiedAt,
+    canonicalUrl,
+    text: text.slice(0, 22000),
   };
 }
 
-async function summarizeOneUrl(rawUrl: string) {
+async function summarizeOneUrl(rawUrl: string): Promise<ReadablePage> {
   const safeUrl = await assertSafeUrl(rawUrl);
   const html = await fetchText(safeUrl.toString());
   const content = extractReadableContent(html);
@@ -387,12 +490,17 @@ async function summarizeOneUrl(rawUrl: string) {
     url: safeUrl.toString(),
     title: content.title,
     description: content.description,
+    siteName: content.siteName,
+    author: content.author,
+    publishedAt: content.publishedAt,
+    modifiedAt: content.modifiedAt,
+    canonicalUrl: content.canonicalUrl,
     text: content.text,
   };
 }
 
-export async function searchWeb({ query, limit = 5 }: { query: string; limit?: number }) {
-  const safeLimit = Math.max(1, Math.min(5, Math.floor(limit || 5)));
+async function collectSearchResults(query: string, limit = 8) {
+  const safeLimit = Math.max(1, Math.min(15, Math.floor(limit || 8)));
   const attemptedQueries = buildSearchQueries(query);
   const importantTerms = getImportantTerms(query);
   const attemptedSources: string[] = [];
@@ -431,21 +539,29 @@ export async function searchWeb({ query, limit = 5 }: { query: string; limit?: n
     }
   }
 
-  return jsonText({
+  return {
     query,
     attemptedQueries,
     importantTerms,
     attemptedSources,
     results,
     answerHints: extractAnswerHints(results),
-    markdown: results.map((result, index) => `${index + 1}. [${result.title}](${result.url}) — ${result.snippet}`).join('\n'),
     searchErrors,
-    instruction: 'Use estes resultados para responder em português com links Markdown descritivos. Se answerHints contiverem o dado pedido, responda o dado diretamente e cite a fonte. Se não contiverem, use summarize_url em até 5 resultados para extrair o valor/conteúdo. Não responda apenas com links. Se results estiver vazio, diga que a busca não encontrou fontes suficientes e peça mais contexto, mencionando apenas de forma breve as consultas tentadas.',
+  };
+}
+
+export async function searchWeb({ query, limit = 8 }: { query: string; limit?: number }) {
+  const search = await collectSearchResults(query, Math.max(1, Math.min(10, Math.floor(limit || 8))));
+
+  return jsonText({
+    ...search,
+    markdown: search.results.map((result, index) => `${index + 1}. [${result.title}](${result.url}) — ${result.snippet}`).join('\n'),
+    instruction: 'Use estes resultados como descoberta de fontes. Para notícia/caso em andamento ou quando o usuário pedir contexto, abra 4 a 8 resultados relevantes com summarize_url ou prefira research_web antes de responder, salvo se os snippets já bastarem para um dado simples. Responda em português como redator: texto corrido em parágrafos conectados, proporcional à complexidade, sem tópicos por fonte e sem mini-resumos do tipo "Suspensão:", "Histórico:" salvo pedido explícito. Links Markdown são opcionais se o usuário disser que não precisa, mas se usar links, ancore em 1 ou 2 palavras no máximo e nunca em frases inteiras. Se answerHints contiverem um dado pontual pedido, responda o dado diretamente e cite a fonte quando fizer sentido. Se results estiver vazio, diga que a busca não encontrou fontes suficientes e peça mais contexto, mencionando apenas de forma breve as consultas tentadas. Não use encerramento genérico, piadas, emojis ou metáforas em assunto factual.',
   });
 }
 
 export async function summarizeUrl({ url, urls }: { url?: string; urls?: string[] }) {
-  const targets = (urls?.length ? urls : url ? [url] : []).slice(0, 5);
+  const targets = (urls?.length ? urls : url ? [url] : []).slice(0, 10);
 
   if (targets.length === 0) {
     return jsonText({ error: 'Informe url ou urls.' });
@@ -469,6 +585,486 @@ export async function summarizeUrl({ url, urls }: { url?: string; urls?: string[
     pages,
     successful: pages.filter(page => page.ok).length,
     failed: pages.filter(page => !page.ok).length,
-    instruction: 'Use as páginas bem-sucedidas para responder em português. Se o usuário pediu um dado específico, extraia e informe o dado diretamente, citando a fonte com Markdown. Se algumas URLs falharam, só mencione isso se afetar a resposta.',
+    instruction: 'Use as páginas bem-sucedidas para responder em português com uma síntese redigida e bem embasada. Para notícias/casos, conecte os fatos entre as fontes: o que aconteceu, quando, causa provável/confirmada, consequências, desdobramentos, divergências e incertezas. Escreva como redator em texto corrido; pode usar mais parágrafos quando o assunto pedir profundidade. Não faça resumo tópico de cada fonte salvo se o usuário pedir. Se usar links Markdown, ancore em 1 ou 2 palavras no máximo no ponto exato que a fonte sustenta; não use URL crua nem frases inteiras como link. Não use encerramento genérico, piadas, emojis ou metáforas em assunto factual. Se algumas URLs falharam, só mencione isso se afetar a resposta.',
+  });
+}
+
+function sourceNameFromUrl(rawUrl: string) {
+  try {
+    const hostname = new URL(rawUrl).hostname.replace(/^www\./, '');
+    return hostname.split('.').slice(0, -1).join('.') || hostname;
+  } catch {
+    return 'fonte';
+  }
+}
+
+function tryParseJsonObject<T>(value: string, fallback: T): T {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    const match = value.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+
+    try {
+      return JSON.parse(match[0]) as T;
+    } catch {
+      return fallback;
+    }
+  }
+}
+
+async function askJson<T>(args: {
+  system?: string;
+  prompt: string;
+  fallback: T;
+  temperature?: number;
+}) {
+  try {
+    const response = await getOpenAI().chat.completions.create({
+      model: process.env.RESEARCH_MODEL || process.env.WEB_RESEARCH_MODEL || 'gpt-4o-mini',
+      messages: [
+        ...(args.system ? [{ role: 'system' as const, content: args.system }] : []),
+        { role: 'user' as const, content: args.prompt },
+      ],
+      temperature: args.temperature ?? 0,
+      response_format: { type: 'json_object' },
+    });
+
+    return tryParseJsonObject(response.choices[0]?.message?.content || '{}', args.fallback);
+  } catch {
+    return args.fallback;
+  }
+}
+
+async function generateResearchQueries(args: {
+  query: string;
+  context?: string;
+  depth: ResearchDepth;
+}) {
+  const maxQueries = args.depth === 'deep' ? 6 : args.depth === 'standard' ? 4 : 2;
+  const fallbackQueries = buildSearchQueries(args.query).slice(0, maxQueries);
+  const planned = await askJson<{
+    queries?: string[];
+    intent?: string;
+    freshnessNeeded?: boolean;
+  }>({
+    system: 'You create web search query plans. Return strict JSON only.',
+    prompt: [
+      'Crie consultas de busca web para pesquisar a pergunta do usuario.',
+      'Use portugues quando fizer sentido, mas inclua nomes proprios/termos exatos.',
+      'Evite consultas redundantes. Inclua datas/local se ajudarem.',
+      `Profundidade: ${args.depth}. Maximo de consultas: ${maxQueries}.`,
+      `Pergunta: ${args.query}`,
+      args.context ? `Contexto da conversa: ${truncate(args.context, 1500)}` : '',
+      'JSON esperado: {"intent":"...","freshnessNeeded":true,"queries":["..."]}',
+    ].filter(Boolean).join('\n'),
+    fallback: {
+      queries: fallbackQueries,
+      intent: args.query,
+      freshnessNeeded: true,
+    },
+  });
+
+  const queries: string[] = [];
+  for (const query of [...(planned.queries || []), ...fallbackQueries]) {
+    addSearchQuery(queries, query);
+  }
+
+  return {
+    intent: planned.intent || args.query,
+    freshnessNeeded: planned.freshnessNeeded !== false,
+    queries: queries.slice(0, maxQueries),
+  };
+}
+
+function addUniqueSearchResult(target: Array<SearchResult & { query: string }>, incoming: SearchResult[], query: string, limit: number) {
+  for (const result of incoming) {
+    if (target.length >= limit) break;
+    if (target.some(existing => existing.url === result.url)) continue;
+    target.push({ ...result, query });
+  }
+}
+
+async function rankResearchResults(args: {
+  query: string;
+  results: Array<SearchResult & { query: string }>;
+  depth: ResearchDepth;
+}) {
+  const fallback = args.results.map((result, index) => ({
+    id: index + 1,
+    score: Math.max(20, 90 - index * 8),
+    reason: 'Resultado relevante pelos termos encontrados na busca.',
+    shouldRead: index < (args.depth === 'deep' ? 5 : args.depth === 'standard' ? 4 : 2),
+  }));
+
+  if (args.results.length === 0) return [];
+
+  const ranked = await askJson<{
+    ranked?: Array<{ id?: number; score?: number; reason?: string; shouldRead?: boolean }>;
+  }>({
+    system: 'You rank search results for web research. Return strict JSON only.',
+    prompt: [
+      'Rankeie estes resultados para responder a pergunta do usuario.',
+      'Priorize fontes que respondem diretamente, tem especificidade, data/atualidade e parecem ser materia/fonte primaria ou jornalistica confiavel.',
+      'Penalize resultados superficiais, duplicados, agregadores ou que apenas mencionam o tema.',
+      'score vai de 0 a 100. shouldRead=true para paginas que devem ser abertas.',
+      `Pergunta: ${args.query}`,
+      `Resultados: ${JSON.stringify(args.results.map((result, index) => ({
+        id: index + 1,
+        query: result.query,
+        title: result.title,
+        url: result.url,
+        snippet: result.snippet,
+        source: result.source,
+      })))}`,
+      'JSON esperado: {"ranked":[{"id":1,"score":90,"reason":"...","shouldRead":true}]}',
+    ].join('\n'),
+    fallback: { ranked: fallback },
+  });
+
+  return (ranked.ranked?.length ? ranked.ranked : fallback)
+    .map((item) => {
+      const source = typeof item.id === 'number' ? args.results[item.id - 1] : undefined;
+      if (!source) return null;
+      return {
+        ...source,
+        rank: item.id!,
+        score: Math.max(0, Math.min(100, Math.round(item.score || 0))),
+        reason: item.reason || '',
+        shouldRead: Boolean(item.shouldRead),
+      };
+    })
+    .filter((item): item is SearchResult & { query: string; rank: number; score: number; reason: string; shouldRead: boolean } => Boolean(item))
+    .sort((a, b) => b.score - a.score);
+}
+
+function extractFallbackClaims(page: ReadablePage, sourceId: number) {
+  const sentences = [page.description, page.text]
+    .filter(Boolean)
+    .join(' ')
+    .split(/(?<=[.!?])\s+/)
+    .map(sentence => sentence.trim())
+    .filter(sentence => sentence.length > 40)
+    .slice(0, 4);
+
+  return sentences.map(sentence => ({
+    claim: sentence,
+    sourceIds: [sourceId],
+    confidence: 'medium',
+  }));
+}
+
+async function synthesizeResearch(args: {
+  query: string;
+  depth: ResearchDepth;
+  pages: ReadablePage[];
+  rankedResults: Awaited<ReturnType<typeof rankResearchResults>>;
+}) {
+  const sources = args.pages.map((page, index) => ({
+    id: index + 1,
+    title: page.title || sourceNameFromUrl(page.url),
+    url: page.url,
+    siteName: page.siteName || sourceNameFromUrl(page.url),
+    author: page.author,
+    publishedAt: page.publishedAt,
+    modifiedAt: page.modifiedAt,
+    description: page.description,
+    text: truncate(page.text, args.depth === 'deep' ? 11000 : args.depth === 'standard' ? 8000 : 5000),
+  }));
+
+  const fallbackClaims = args.pages.flatMap((page, index) => extractFallbackClaims(page, index + 1)).slice(0, 12);
+  const fallback = {
+    answerDraft: '',
+    keyFindings: fallbackClaims.map(claim => claim.claim).slice(0, 6),
+    claims: fallbackClaims,
+    timeline: [],
+    conflicts: [],
+    gaps: args.pages.length === 0 ? ['Nenhuma pagina foi lida com sucesso.'] : [],
+    sourceNotes: sources.map(source => ({
+      sourceId: source.id,
+      title: source.title,
+      url: source.url,
+      whyUseful: source.description || 'Fonte aberta durante a pesquisa.',
+    })),
+  };
+
+  if (sources.length === 0) return fallback;
+
+  return askJson<{
+    answerDraft?: string;
+    keyFindings?: string[];
+    claims?: Array<{ claim?: string; sourceIds?: number[]; confidence?: string }>;
+    timeline?: Array<{ date?: string; event?: string; sourceIds?: number[] }>;
+    conflicts?: string[];
+    gaps?: string[];
+    sourceNotes?: Array<{ sourceId?: number; title?: string; url?: string; whyUseful?: string }>;
+  }>({
+    system: 'You synthesize web research into structured evidence. Return strict JSON only.',
+    prompt: [
+      'Sintetize a pesquisa abaixo em portugues, usando somente as fontes fornecidas.',
+      'Extraia fatos verificaveis, datas, numeros, causas, consequencias, desdobramentos, conflitos e lacunas.',
+      'Nao invente. Se algo nao estiver claro, coloque em gaps ou conflicts.',
+      'answerDraft deve ser um rascunho natural para Discord, em estilo de redator: texto corrido, paragrafos conectados, sem bullets/topicos por fonte e proporcional a complexidade da pesquisa. Pode ter varios paragrafos quando o tema precisar de contexto; seja curto apenas para perguntas simples.',
+      'Nao termine com frase generica de oferta de ajuda. Nao use piadas, emojis ou metaforas em assunto factual.',
+      'Cada claim importante deve apontar sourceIds.',
+      `Pergunta: ${args.query}`,
+      `Fontes abertas: ${JSON.stringify(sources)}`,
+      'JSON esperado: {"answerDraft":"...","keyFindings":["..."],"claims":[{"claim":"...","sourceIds":[1],"confidence":"high|medium|low"}],"timeline":[{"date":"...","event":"...","sourceIds":[1]}],"conflicts":["..."],"gaps":["..."],"sourceNotes":[{"sourceId":1,"title":"...","url":"...","whyUseful":"..."}]}',
+    ].join('\n'),
+    fallback,
+  });
+}
+
+export async function researchWeb({
+  query,
+  context,
+  depth = 'standard',
+  limit,
+}: {
+  query: string;
+  context?: string;
+  depth?: ResearchDepth;
+  limit?: number;
+}) {
+  const safeDepth: ResearchDepth = ['quick', 'standard', 'deep'].includes(depth) ? depth : 'standard';
+  const resultLimit = Math.max(5, Math.min(18, Math.floor(limit || (safeDepth === 'deep' ? 15 : safeDepth === 'standard' ? 12 : 8))));
+  const readLimit = safeDepth === 'deep' ? 8 : safeDepth === 'standard' ? 6 : 4;
+  const queryPlan = await generateResearchQueries({ query, context, depth: safeDepth });
+  const aggregateResults: Array<SearchResult & { query: string }> = [];
+  const searchDiagnostics = [];
+
+  for (const searchQuery of queryPlan.queries) {
+    const search = await collectSearchResults(searchQuery, resultLimit);
+    searchDiagnostics.push({
+      query: searchQuery,
+      attemptedQueries: search.attemptedQueries,
+      results: search.results.length,
+      errors: search.searchErrors,
+    });
+    addUniqueSearchResult(aggregateResults, search.results, searchQuery, resultLimit * 2);
+  }
+
+  const rankedResults = await rankResearchResults({ query, results: aggregateResults, depth: safeDepth });
+  const urlsToRead = rankedResults
+    .filter(result => result.shouldRead)
+    .slice(0, readLimit);
+  const fallbackUrls = rankedResults
+    .filter(result => !urlsToRead.some(selected => selected.url === result.url))
+    .slice(0, Math.max(0, readLimit - urlsToRead.length));
+  const selectedResults = [...urlsToRead, ...fallbackUrls].slice(0, readLimit);
+  const pages: PageResult[] = [];
+
+  for (const result of selectedResults) {
+    try {
+      pages.push(await summarizeOneUrl(result.url));
+    } catch (error) {
+      pages.push({
+        ok: false,
+        url: result.url,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const successfulPages = pages.filter((page): page is ReadablePage => page.ok);
+  const synthesis = await synthesizeResearch({ query, depth: safeDepth, pages: successfulPages, rankedResults });
+  const sources = successfulPages.map((page, index) => ({
+    id: index + 1,
+    title: page.title || sourceNameFromUrl(page.url),
+    url: page.url,
+    siteName: page.siteName || sourceNameFromUrl(page.url),
+    author: page.author,
+    publishedAt: page.publishedAt,
+    modifiedAt: page.modifiedAt,
+    description: page.description,
+    excerpt: truncate(page.text, 1800),
+  }));
+
+  return jsonText({
+    success: successfulPages.length > 0 || rankedResults.length > 0,
+    query,
+    depth: safeDepth,
+    queryPlan,
+    searchedResults: rankedResults.slice(0, resultLimit).map(result => ({
+      title: result.title,
+      url: result.url,
+      snippet: result.snippet,
+      query: result.query,
+      score: result.score,
+      reason: result.reason,
+      selectedForReading: selectedResults.some(selected => selected.url === result.url),
+    })),
+    searchDiagnostics,
+    sources,
+    failedSources: pages.filter((page): page is FailedPage => !page.ok),
+    synthesis,
+    citationGuidance: sources.map(source => ({
+      sourceId: source.id,
+      label: source.siteName,
+      markdown: `[${source.siteName}](${source.url})`,
+    })),
+    instruction: 'Use synthesis.answerDraft, claims e sources para responder em portugues. Para perguntas de noticia/caso/pesquisa, responda como redator: texto corrido em paragrafos conectados, aprofundado conforme o assunto pedir, com contexto, cronologia e nuances. Seja breve apenas se o usuario pedir algo simples ou se a pergunta for pontual. Nao responda como lista por fonte, nem com topicos tipo "Suspensao:", "Historico:" salvo pedido explicito. Se o usuario pediu sem links, nao inclua links; se nao pediu sem links, links Markdown sao opcionais e devem ficar em 1 ou 2 palavras no maximo no ponto sustentado pela fonte. Use claims com sourceIds para decidir onde citar dinamicamente. Se gaps/conflicts existirem e forem relevantes, mencione a incerteza de forma natural. Nao use encerramento generico, piadas, emojis ou metaforas em assunto factual. Esta pesquisa fica disponivel na memoria recente do canal para follow-ups e pedidos posteriores de fontes.',
+  });
+}
+
+export async function verifyWebClaim({
+  claim,
+  question,
+  context,
+  depth = 'standard',
+  limit,
+}: {
+  claim: string;
+  question?: string;
+  context?: string;
+  depth?: ResearchDepth;
+  limit?: number;
+}) {
+  const safeDepth: ResearchDepth = ['quick', 'standard', 'deep'].includes(depth) ? depth : 'standard';
+  const maxChecks = safeDepth === 'deep' ? 6 : safeDepth === 'standard' ? 4 : 2;
+  const verificationPlan = await askJson<{
+    coreQuestion?: string;
+    requiredChecks?: Array<{ question?: string; purpose?: string; priority?: number }>;
+    answerNeeds?: string[];
+  }>({
+    system: 'You plan factual verification research. Return strict JSON only.',
+    prompt: [
+      'Crie um plano de verificacao factual para responder perfeitamente a pergunta do usuario.',
+      'Nao faca plano especifico para um dominio; decomponha genericamente a afirmacao em fatos necessarios.',
+      'Inclua subperguntas para identificar entidades/cargos, periodo relevante, pessoas envolvidas, origem da nomeacao/decisao, composicao do orgao/equipe e fontes oficiais quando isso for relevante.',
+      'Cada subpergunta deve ser pesquisavel na web e ajudar a confirmar/refutar a afirmacao.',
+      `Maximo de subpesquisas: ${maxChecks}.`,
+      `Claim: ${claim}`,
+      question ? `Pergunta original: ${question}` : '',
+      context ? `Contexto: ${truncate(context, 2000)}` : '',
+      'JSON esperado: {"coreQuestion":"...","requiredChecks":[{"question":"...","purpose":"...","priority":1}],"answerNeeds":["..."]}',
+    ].filter(Boolean).join('\n'),
+    fallback: {
+      coreQuestion: question || claim,
+      requiredChecks: [
+        { question: question || claim, purpose: 'Verificar diretamente a afirmação principal.', priority: 1 },
+      ],
+      answerNeeds: ['Confirmar ou refutar a afirmação com fonte explícita.'],
+    },
+  });
+
+  const plannedQueries: string[] = [];
+  const addPlannedQuery = (value?: string) => {
+    const normalized = value?.replace(/\s+/g, ' ').trim();
+    if (!normalized) return;
+    if (!plannedQueries.some(existing => existing.toLocaleLowerCase('pt-BR') === normalized.toLocaleLowerCase('pt-BR'))) {
+      plannedQueries.push(normalized);
+    }
+  };
+
+  addPlannedQuery(verificationPlan.coreQuestion || question || claim);
+  for (const check of (verificationPlan.requiredChecks || [])
+    .sort((a, b) => (a.priority || 99) - (b.priority || 99))) {
+    addPlannedQuery(check.question);
+  }
+  addPlannedQuery(claim);
+
+  const researchRuns = [];
+  for (const plannedQuery of plannedQueries.slice(0, maxChecks)) {
+    const result = await researchWeb({
+      query: plannedQuery,
+      context,
+      depth: plannedQuery === plannedQueries[0] ? safeDepth : 'quick',
+      limit: limit || (safeDepth === 'deep' ? 12 : 8),
+    });
+    const text = result.content[0]?.text || '{}';
+    try {
+      researchRuns.push(JSON.parse(text));
+    } catch {
+      researchRuns.push({ query: plannedQuery, success: false, error: 'Resultado de pesquisa não veio em JSON válido.' });
+    }
+  }
+
+  const combinedSources = researchRuns.flatMap((run: any, runIndex: number) => (
+    Array.isArray(run.sources) ? run.sources.map((source: any) => ({
+      globalId: `${runIndex + 1}.${source.id}`,
+      runIndex: runIndex + 1,
+      sourceId: source.id,
+      query: run.query,
+      title: source.title,
+      siteName: source.siteName,
+      url: source.url,
+      publishedAt: source.publishedAt,
+      modifiedAt: source.modifiedAt,
+      description: source.description,
+      excerpt: typeof source.excerpt === 'string' ? truncate(source.excerpt, 1200) : undefined,
+    })) : []
+  ));
+
+  const compactResearch = researchRuns.map((run: any, index: number) => ({
+    runIndex: index + 1,
+    query: run.query,
+    depth: run.depth,
+    queryPlan: run.queryPlan,
+    sources: Array.isArray(run.sources)
+      ? run.sources.map((source: any) => ({
+        sourceRef: `${index + 1}.${source.id}`,
+        title: source.title,
+        siteName: source.siteName,
+        url: source.url,
+        publishedAt: source.publishedAt,
+        modifiedAt: source.modifiedAt,
+        description: source.description,
+        excerpt: typeof source.excerpt === 'string' ? truncate(source.excerpt, 1200) : undefined,
+      }))
+      : [],
+    synthesis: run.synthesis,
+    failedSources: run.failedSources,
+  }));
+
+
+  const verdict = await askJson<{
+    verdict?: 'supported' | 'contradicted' | 'unclear';
+    confidence?: 'high' | 'medium' | 'low';
+    answer?: string;
+    supportedClaims?: Array<{ claim?: string; sourceRefs?: string[]; evidence?: string }>;
+    contradictedClaims?: Array<{ claim?: string; sourceRefs?: string[]; evidence?: string }>;
+    missingEvidence?: string[];
+    followUpSearches?: string[];
+  }>({
+    system: 'You verify factual claims using only provided research sources. Return strict JSON only.',
+    prompt: [
+      'Verifique a afirmacao/pergunta usando somente as pesquisas fornecidas.',
+      'Nao use conhecimento interno. Se a pesquisa nao prova nem refuta, verdict deve ser "unclear".',
+      'Para cargos atuais, nomeacoes, datas, autoria, diretorias, governos e relacoes politicas, exija fonte explicita.',
+      'Se a pergunta tiver varias partes, responda cada parte relevante: quem era, quem nomeou/indicou, periodo, composicao, e se isso confirma ou nao a afirmacao original.',
+      'Nao pare no primeiro "sim" ou "nao"; use as subpesquisas para explicar o quadro factual completo.',
+      'Se houver conflito entre fontes, explique em contradictedClaims ou missingEvidence.',
+      `Claim: ${claim}`,
+      question ? `Pergunta do usuario: ${question}` : '',
+      `Plano de verificacao: ${JSON.stringify(verificationPlan)}`,
+      `Pesquisas JSON: ${JSON.stringify(compactResearch)}`,
+      'JSON esperado: {"verdict":"supported|contradicted|unclear","confidence":"high|medium|low","answer":"...","supportedClaims":[{"claim":"...","sourceRefs":["1.1"],"evidence":"..."}],"contradictedClaims":[{"claim":"...","sourceRefs":["2.1"],"evidence":"..."}],"missingEvidence":["..."],"followUpSearches":["..."]}',
+    ].filter(Boolean).join('\n'),
+    fallback: {
+      verdict: 'unclear',
+      confidence: 'low',
+      answer: 'Não encontrei evidência suficiente nas fontes abertas para confirmar isso com segurança.',
+      supportedClaims: [],
+      contradictedClaims: [],
+      missingEvidence: ['A verificação automática não conseguiu estruturar evidências suficientes.'],
+      followUpSearches: [],
+    },
+  });
+
+  return jsonText({
+    success: researchRuns.some((run: any) => run.success),
+    claim,
+    question: question || null,
+    verificationPlan,
+    researchRuns: compactResearch,
+    verdict,
+    sources: combinedSources,
+    citationGuidance: combinedSources.map(source => ({
+      sourceRef: source.globalId,
+      label: source.siteName || source.title || 'fonte',
+      markdown: `[${source.siteName || source.title || 'fonte'}](${source.url})`,
+    })),
+    instruction: 'Responda em portugues usando verdict.answer, researchRuns e sources. Seja investigativo e redacional: explique o quadro factual necessario para responder em paragrafos conectados, nao apenas "sim" ou "nao", salvo se o usuario pediu uma resposta curta. Se verdict for unclear ou confidence low, nao confirme a afirmacao; diga exatamente o que foi e nao foi confirmado. Para cargos, nomeacoes, datas e pessoas, so afirme nomes quando houver fonte explicita. Se usar links Markdown, ancore em 1 ou 2 palavras no maximo no ponto sustentado pela fonte. Nao use bullets por fonte, encerramento generico, piadas, metaforas ou emojis em verificacoes factuais.',
   });
 }

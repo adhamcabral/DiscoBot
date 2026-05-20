@@ -4,7 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { File } from 'node:buffer';
 import { createImage, editImage, getImageResult } from './tools/imageTools.js';
-import { searchWeb, summarizeUrl } from './tools/webTools.js';
+import { researchWeb, searchWeb, summarizeUrl, verifyWebClaim } from './tools/webTools.js';
 import { createStickerEmoji, stickerEmojiCreator } from './tools/stickerEmojiTools.js';
 import { analyzeImage, visualSearchImage } from './tools/visionTools.js';
 import { readDiscordContext, scheduleReminder } from './tools/discordTools.js';
@@ -47,21 +47,46 @@ server.tool(
 );
 
 server.tool(
+  'research_web',
+  'Pesquisa a web como um pesquisador: planeja consultas, busca fontes, ranqueia resultados, abre paginas relevantes, extrai fatos/claims e devolve uma sintese estruturada com fontes. Use para qualquer tema que exija pesquisa bem embasada: noticias, casos em andamento, tecnologia, ciencia, saude, consumo, empresas, produtos, cultura, esportes, mercado, comparacoes ou contexto. Para perguntas simples e pontuais, search_web ainda pode bastar.',
+  {
+    query: z.string().min(2).describe('Pergunta ou tema de pesquisa.'),
+    context: z.string().optional().describe('Contexto opcional da conversa, se ajudar a desambiguar a pesquisa.'),
+    depth: z.enum(['quick', 'standard', 'deep']).default('standard').describe('quick abre poucas fontes; standard equilibra qualidade e custo; deep faz pesquisa mais ampla.'),
+    limit: z.number().min(5).max(18).optional().describe('Quantidade maxima de resultados ranqueados a retornar. A ferramenta abre as melhores fontes conforme depth.'),
+  },
+  researchWeb,
+);
+
+server.tool(
+  'verify_web_claim',
+  'Verifica uma afirmação factual usando pesquisa web investigativa: decompõe a pergunta em subchecagens, busca fontes, abre paginas, cruza evidências e retorna se a afirmação é supported, contradicted ou unclear. Use para qualquer assunto quando uma resposta sem fonte possa virar invenção: "é verdade que...", "isso procede?", "quem foi?", "quem indicou?", "quem criou?", versões, produtos, saúde, ciência, tecnologia, datas, autoria, preços, cargos, nomes, empresas, relações entre entidades ou fatos atuais.',
+  {
+    claim: z.string().min(2).describe('Afirmação factual a verificar ou hipótese que precisa ser checada.'),
+    question: z.string().optional().describe('Pergunta original do usuário, se diferente da afirmação.'),
+    context: z.string().optional().describe('Contexto da conversa ou da pesquisa anterior que ajuda a desambiguar.'),
+    depth: z.enum(['quick', 'standard', 'deep']).default('standard').describe('quick verifica com poucas fontes; standard equilibra; deep amplia a checagem.'),
+    limit: z.number().min(5).max(18).optional().describe('Quantidade maxima de resultados ranqueados a retornar.'),
+  },
+  verifyWebClaim,
+);
+
+server.tool(
   'search_web',
-  'Pesquisa a web. Use esta ferramenta para notícias, últimas notícias, fatos atuais/recentes, preços, cotações, versões, agendas, placares ou quando o usuário pedir para pesquisar/procurar na internet. Não use ferramentas de imagem para pedidos de notícias, mesmo que exista imagem antiga no histórico, a menos que o usuário peça explicitamente para analisar uma imagem.',
+  'Pesquisa a web. Use esta ferramenta para notícias, últimas notícias, fatos atuais/recentes, preços, cotações, versões, agendas, placares ou quando o usuário pedir para pesquisar/procurar na internet. Para notícias/casos em andamento, use os resultados como descoberta de fontes e chame summarize_url em fontes relevantes quando precisar de conteúdo mais embasado que snippets. Não use ferramentas de imagem para pedidos de notícias, mesmo que exista imagem antiga no histórico, a menos que o usuário peça explicitamente para analisar uma imagem.',
   {
     query: z.string().min(2).describe('Consulta de busca objetiva. Inclua termos principais, entidade, data/local se relevante.'),
-    limit: z.number().min(1).max(5).default(5).describe('Quantidade máxima de resultados. Limite operacional: 5.'),
+    limit: z.number().min(1).max(10).default(8).describe('Quantidade máxima de resultados. Limite operacional: 10.'),
   },
   searchWeb,
 );
 
 server.tool(
   'summarize_url',
-  'Baixa e extrai o conteúdo legível de até 5 URLs públicas. Se uma fonte falhar, continua tentando as outras.',
+  'Baixa e extrai o conteúdo legível de até 5 URLs públicas. Use depois de search_web quando precisar sintetizar notícias, casos recentes ou páginas específicas com mais base do que os snippets. Se uma fonte falhar, continua tentando as outras.',
   {
     url: z.string().url().optional().describe('URL pública http/https para resumir. URLs locais e redes privadas são bloqueadas.'),
-    urls: z.array(z.string().url()).max(5).optional().describe('Até 5 URLs públicas para tentar extrair. Use quando uma busca retornar várias fontes ou quando uma fonte pode falhar.'),
+    urls: z.array(z.string().url()).max(10).optional().describe('Até 10 URLs públicas para tentar extrair. Use quando uma busca retornar várias fontes ou quando uma fonte pode falhar.'),
   },
   summarizeUrl,
 );

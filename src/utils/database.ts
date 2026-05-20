@@ -31,6 +31,15 @@ export type ReminderRecord = {
   error?: string;
 };
 
+export type ResearchMemoryRecord = {
+  id: number;
+  channelId: string;
+  sourceMessageId: string;
+  toolName: string;
+  content: string;
+  createdAt: string;
+};
+
 let db: Database.Database | null = null;
 
 function getDb() {
@@ -72,10 +81,104 @@ function getDb() {
 
       CREATE INDEX IF NOT EXISTS idx_reminders_user
         ON reminders (user_id, status, due_at);
+
+      CREATE TABLE IF NOT EXISTS research_memory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id TEXT NOT NULL,
+        source_message_id TEXT NOT NULL,
+        tool_name TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_research_memory_channel
+        ON research_memory (channel_id, id);
+
+      CREATE INDEX IF NOT EXISTS idx_research_memory_source_message
+        ON research_memory (channel_id, source_message_id);
     `);
   }
 
   return db;
+}
+
+function mapResearchMemoryRow(row: {
+  id: number;
+  channel_id: string;
+  source_message_id: string;
+  tool_name: string;
+  content: string;
+  created_at: string;
+}): ResearchMemoryRecord {
+  return {
+    id: row.id,
+    channelId: row.channel_id,
+    sourceMessageId: row.source_message_id,
+    toolName: row.tool_name,
+    content: row.content,
+    createdAt: row.created_at,
+  };
+}
+
+export async function addResearchMemory(input: {
+  channelId: string;
+  sourceMessageId: string;
+  toolName: string;
+  content: string;
+}): Promise<void> {
+  await initializeDatabase();
+  const now = new Date().toISOString();
+  getDb().prepare(`
+    INSERT INTO research_memory (channel_id, source_message_id, tool_name, content, created_at)
+    VALUES (@channelId, @sourceMessageId, @toolName, @content, @now)
+  `).run({ ...input, now });
+
+  getDb().prepare(`
+    DELETE FROM research_memory
+    WHERE channel_id = ?
+      AND id NOT IN (
+        SELECT id FROM research_memory
+        WHERE channel_id = ?
+        ORDER BY id DESC
+        LIMIT 160
+      )
+  `).run(input.channelId, input.channelId);
+}
+
+export async function getResearchMemoryForMessages(channelId: string, sourceMessageIds: string[]): Promise<ResearchMemoryRecord[]> {
+  await initializeDatabase();
+  if (sourceMessageIds.length === 0) return [];
+
+  const placeholders = sourceMessageIds.map(() => '?').join(',');
+  const rows = getDb()
+    .prepare(`
+      SELECT * FROM research_memory
+      WHERE channel_id = ?
+        AND source_message_id IN (${placeholders})
+      ORDER BY id ASC
+      LIMIT 80
+    `)
+    .all(channelId, ...sourceMessageIds) as Parameters<typeof mapResearchMemoryRow>[0][];
+
+  return rows.map(mapResearchMemoryRow);
+}
+
+export async function pruneResearchMemoryToMessages(channelId: string, sourceMessageIds: string[]): Promise<void> {
+  await initializeDatabase();
+
+  if (sourceMessageIds.length === 0) {
+    getDb().prepare('DELETE FROM research_memory WHERE channel_id = ?').run(channelId);
+    return;
+  }
+
+  const placeholders = sourceMessageIds.map(() => '?').join(',');
+  getDb()
+    .prepare(`
+      DELETE FROM research_memory
+      WHERE channel_id = ?
+        AND source_message_id NOT IN (${placeholders})
+    `)
+    .run(channelId, ...sourceMessageIds);
 }
 
 async function hardenDatabaseFile() {

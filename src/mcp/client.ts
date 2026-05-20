@@ -17,6 +17,17 @@ let isConnecting = false;
 let connected = false;
 let reconnectAttempts = 0;
 
+const DEFAULT_MCP_TOOL_TIMEOUT_MS = Number(process.env.MCP_TOOL_TIMEOUT_MS || 180000);
+const RESEARCH_MCP_TOOL_TIMEOUT_MS = Number(process.env.MCP_RESEARCH_TIMEOUT_MS || 900000);
+const LONG_RUNNING_TOOLS = new Set([
+  'research_web',
+  'verify_web_claim',
+  'visual_search_image',
+  'create_image',
+  'edit_image',
+  'get_image_result',
+]);
+
 function getServerPath() {
   return path.join(process.cwd(), 'dist', 'mcp', 'server.js');
 }
@@ -119,11 +130,17 @@ export async function callMcpTool(toolName: string, args: Record<string, unknown
   }
 
   let success = false;
+  const timeout = LONG_RUNNING_TOOLS.has(toolName)
+    ? RESEARCH_MCP_TOOL_TIMEOUT_MS
+    : DEFAULT_MCP_TOOL_TIMEOUT_MS;
 
   try {
     const result = await mcpClient!.callTool({
       name: toolName,
       arguments: args,
+    }, undefined, {
+      timeout,
+      maxTotalTimeout: timeout,
     });
 
     success = true;

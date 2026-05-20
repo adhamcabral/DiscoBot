@@ -1,6 +1,7 @@
 import { Message } from 'discord.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/index.js';
 import type { ImageCandidate, WritableTextChannel } from './types.js';
+import { getRecentResearchMemory } from './researchMemory.js';
 
 function pushImageCandidate(candidates: ImageCandidate[], candidate: ImageCandidate) {
   if (!candidate.url) return;
@@ -22,8 +23,11 @@ function appendImageAttachmentMarkers(message: Message, content: string, imageCa
 }
 
 export async function buildConversationContext(message: Message, channel: WritableTextChannel) {
-  const messageHistory = await channel.messages.fetch({ limit: 20 });
+  const messageHistory = await channel.messages.fetch({ limit: 60 });
   const imageCandidates: ImageCandidate[] = [];
+  const recentMessageIds = new Set(messageHistory.map(msg => msg.id));
+  recentMessageIds.add(message.id);
+  const researchMemory = await getRecentResearchMemory(channel.id, recentMessageIds);
   const conversation: ChatCompletionMessageParam[] = messageHistory
     .reverse()
     .filter(msg => msg.id !== message.id)
@@ -34,6 +38,13 @@ export async function buildConversationContext(message: Message, channel: Writab
         content,
       };
     });
+
+  if (researchMemory) {
+    conversation.unshift({
+      role: 'system',
+      content: researchMemory,
+    });
+  }
 
   conversation.push({
     role: 'user',

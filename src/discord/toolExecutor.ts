@@ -66,6 +66,27 @@ function summarizeToolResult(toolName: string, resultText: string) {
       return `search_web: query=${query}; top=${topResults || 'n/a'}`;
     }
 
+    if (toolName === 'research_web') {
+      const query = parsed.query || 'n/a';
+      const sources = Array.isArray(parsed.sources)
+        ? parsed.sources.slice(0, 4).map((source: any) => source.siteName || source.title).join(' | ')
+        : '';
+      const findings = Array.isArray(parsed.synthesis?.keyFindings)
+        ? parsed.synthesis.keyFindings.slice(0, 3).join(' | ')
+        : '';
+      return `research_web: query=${query}; sources=${sources || 'n/a'}; findings=${findings || 'n/a'}`;
+    }
+
+    if (toolName === 'verify_web_claim') {
+      const claim = parsed.claim || parsed.question || 'n/a';
+      const verdict = parsed.verdict?.verdict || 'unclear';
+      const confidence = parsed.verdict?.confidence || 'low';
+      const sources = Array.isArray(parsed.sources)
+        ? parsed.sources.slice(0, 4).map((source: any) => source.siteName || source.title).join(' | ')
+        : '';
+      return `verify_web_claim: claim=${claim}; verdict=${verdict}; confidence=${confidence}; sources=${sources || 'n/a'}`;
+    }
+
     if (toolName === 'read_discord_context') {
       return `read_discord_context: scanned=${parsed.scannedCount || 0}; returned=${parsed.returnedCount || 0}; query=${parsed.query || 'n/a'}`;
     }

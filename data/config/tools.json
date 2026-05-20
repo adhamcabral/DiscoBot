@@ -10,14 +10,24 @@
     "description": "Agenda, lista ou cancela lembretes persistentes do usuário no Discord."
   },
   {
+    "name": "research_web",
+    "enabled": true,
+    "description": "Pesquisa completa: planeja consultas, busca, ranqueia, abre fontes e devolve síntese estruturada com claims e links."
+  },
+  {
+    "name": "verify_web_claim",
+    "enabled": true,
+    "description": "Verifica afirmações factuais com pesquisa web e retorna se estão confirmadas, refutadas ou incertas com evidências."
+  },
+  {
     "name": "search_web",
     "enabled": true,
-    "description": "Pesquisa a web para notícias, últimas notícias, fatos atuais/recentes, preços, cotações, versões, agendas e pesquisas gerais."
+    "description": "Pesquisa a web para notícias, fatos atuais/recentes, preços, versões, agendas e pesquisas gerais; para notícias, serve como descoberta antes de abrir fontes com summarize_url."
   },
   {
     "name": "summarize_url",
     "enabled": true,
-    "description": "Extrai conteúdo de uma URL pública para resumo em português."
+    "description": "Extrai conteúdo de até 5 URLs públicas para sínteses embasadas em português."
   },
   {
     "name": "analyze_image",
