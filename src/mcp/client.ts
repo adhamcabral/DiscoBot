@@ -2,8 +2,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type OpenAI from 'openai';
 import path from 'path';
-import { logger } from '../utils/logger.js';
-import { loadToolsConfig, registerTool, isToolEnabled, recordToolExecution } from '../utils/toolsManager.js';
+import { logger } from '../logger.js';
+import { loadToolsConfig, registerTool, isToolEnabled, recordToolExecution } from '../config/toolConfig.js';
 
 type McpTool = {
   name: string;
@@ -91,6 +91,7 @@ async function connectMcpClient() {
   logger.debug(`MCP stdio pronto (${tools.length} tools)`);
 }
 
+// Recreates the stdio transport from scratch; this avoids stale child-process state after tool/config changes.
 export async function initializeMcpClient() {
   if (isConnecting) return;
 
@@ -121,6 +122,7 @@ export async function getOpenAiTools(): Promise<OpenAI.Chat.Completions.ChatComp
   return tools.filter((tool) => isToolEnabled(tool.name)).map(toOpenAiTool);
 }
 
+// MCP timeouts are split because research/image jobs are intentionally long-running, unlike normal utility calls.
 export async function callMcpTool(toolName: string, args: Record<string, unknown>): Promise<string> {
   await ensureMcpClient();
   await loadToolsConfig();

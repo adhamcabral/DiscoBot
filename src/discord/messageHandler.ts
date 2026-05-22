@@ -1,25 +1,26 @@
 import { Message } from 'discord.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/index.js';
-import { getNextAction } from '../ai/openaiClient.js';
-import { getBlockedUsers } from '../utils/database.js';
-import { logger, logInteraction } from '../utils/logger.js';
-import { getSafeWritableChannel } from './channelUtils.js';
+import { getNextAction } from '../openaiClient.js';
+import { getBlockedUsers } from '../database.js';
+import { logger, logInteraction } from '../logger.js';
+import { resolveWritableChannel } from './channelUtils.js';
 import { buildConversationContext } from './messageContext.js';
 import { replyLongMessage, sendLongMessage } from './messageSender.js';
-import { handleDirectMediaToolResult } from './mediaToolHandler.js';
+import { sendMediaToolResult } from './mediaToolHandler.js';
 import { recordResearchMemory } from './researchMemory.js';
-import { executeToolCall, isDirectMediaTool } from './toolExecutor.js';
+import { executeTool, sendsMediaDirectly } from './toolExecutor.js';
 import { startToolProgress } from './toolProgress.js';
 
 const MAX_TOOL_LOOPS = 10;
 const AI_TIMEOUT_MS = 900000;
 
+// Orchestrates one Discord interaction: context -> model turn -> tool calls -> final Discord response.
 export async function handleMessage(message: Message) {
   let typingInterval: NodeJS.Timeout | null = null;
   const progressHandles: Array<{ dismiss: () => Promise<void> }> = [];
 
   try {
-    const channel = await getSafeWritableChannel(message.channel);
+    const channel = await resolveWritableChannel(message.channel);
     if (!channel) return;
 
     const blockedUsers = await getBlockedUsers();
@@ -34,6 +35,7 @@ export async function handleMessage(message: Message) {
     const toolDetails: string[] = [];
     let imageSent = false;
 
+    // The model may need several tool/result rounds; the loop cap prevents runaway tool recursion.
     for (let i = 0; i < MAX_TOOL_LOOPS; i++) {
       const currentUser = { id: message.author.id, name: message.author.username };
       const nextAction = await getNextAction(messagesForApi, currentUser, AI_TIMEOUT_MS);
@@ -49,7 +51,7 @@ export async function handleMessage(message: Message) {
       }
 
       const hasMediaToolCall = nextAction.tool_calls.some(toolCall => (
-        toolCall.type === 'function' && isDirectMediaTool(toolCall.function.name)
+        toolCall.type === 'function' && sendsMediaDirectly(toolCall.function.name)
       ));
 
       if (nextAction.content && !imageSent && !hasMediaToolCall) {
@@ -65,7 +67,7 @@ export async function handleMessage(message: Message) {
         const functionArgs = JSON.parse(toolCall.function.arguments);
         const progress = await startToolProgress(channel, functionName, functionArgs);
         if (progress) progressHandles.push(progress);
-        const toolResult = await executeToolCall(functionName, functionArgs, imageCandidates, {
+        const toolResult = await executeTool(functionName, functionArgs, imageCandidates, {
           channel,
           triggerMessage: message,
         });
@@ -81,7 +83,7 @@ export async function handleMessage(message: Message) {
         }
 
         let functionResponseContent = toolResult.result;
-        const mediaResult = await handleDirectMediaToolResult({
+        const mediaResult = await sendMediaToolResult({
           functionName,
           mcpResult: toolResult.result,
           channel,

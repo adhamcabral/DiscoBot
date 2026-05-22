@@ -1,8 +1,9 @@
 import { DMChannel, Message, NewsChannel, StageChannel, TextChannel, ThreadChannel, VoiceChannel } from 'discord.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../logger.js';
 import type { WritableTextChannel } from './types.js';
 
-export async function getSafeWritableChannel(channel: Message['channel']): Promise<WritableTextChannel | null> {
+export async function resolveWritableChannel(channel: Message['channel']): Promise<WritableTextChannel | null> {
+  // Discord can deliver partial channel objects for DMs and uncached channels; fetch them before checking capabilities.
   if (channel.partial) {
     try {
       channel = await channel.fetch();

@@ -3,11 +3,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { File } from 'node:buffer';
-import { createImage, editImage, getImageResult } from './tools/imageTools.js';
-import { researchWeb, searchWeb, summarizeUrl, verifyWebClaim } from './tools/webTools.js';
-import { createStickerEmoji, stickerEmojiCreator } from './tools/stickerEmojiTools.js';
-import { analyzeImage, visualSearchImage } from './tools/visionTools.js';
-import { readDiscordContext, scheduleReminder } from './tools/discordTools.js';
+import { createImage, editImage, getImageResult } from './tools/image.js';
+import { researchWeb, searchWeb, summarizeUrl, verifyWebClaim } from './tools/web.js';
+import { createStickerEmoji, stickerEmojiCreator } from './tools/stickerEmoji.js';
+import { analyzeImage, visualSearchImage } from './tools/vision.js';
+import { readDiscordContext, scheduleReminder } from './tools/discordRuntime.js';
 
 if (!globalThis.File) {
   globalThis.File = File as never;

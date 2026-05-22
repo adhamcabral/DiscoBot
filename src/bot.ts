@@ -1,15 +1,15 @@
 import 'dotenv/config';
 import { client } from './discord/client.js';
 import { initializeMcpClient, shutdownMcpClient } from './mcp/client.js';
-import { initializeAi } from './ai/openaiClient.js';
-import { logger } from './utils/logger.js';
+import { initializeAi } from './openaiClient.js';
+import { logger } from './logger.js';
 import fs from 'fs/promises';
 import { File } from 'node:buffer';
-import { files, ensureRuntimeDirs } from './utils/paths.js';
+import { files, ensureRuntimeDirs } from './config/paths.js';
 import { Events } from 'discord.js';
 import { startReminderScheduler, stopReminderScheduler } from './discord/reminderScheduler.js';
 
-// Polyfill para a classe File
+// The OpenAI upload helpers expect File to exist even on Node runtimes that do not expose it globally.
 if (!globalThis.File) {
   globalThis.File = File as any;
 }
@@ -28,12 +28,13 @@ async function writeStatus() {
     await fs.writeFile(statusPath, JSON.stringify(status, null, 2));
 }
 
+// Boot order matters: tools depend on the compiled MCP server, while Discord event handlers need AI/tool metadata ready.
 async function startBot() {
   try {
     await ensureRuntimeDirs();
     await initializeAi();
 
-    // Inicia o cliente MCP stdio. O servidor MCP é um processo filho local.
+    // The MCP server is local stdio; if it fails, the bot can still answer without tools.
     try {
       await initializeMcpClient();
     } catch (mcpError) {
@@ -44,9 +45,8 @@ async function startBot() {
       logger.info(`${readyClient.user.tag} pronto`);
       startReminderScheduler(client);
 
-      // Escreve o status a cada 30 segundos
       setInterval(writeStatus, 30000);
-      writeStatus(); // Escreve o status inicial
+      writeStatus();
     });
 
     await client.login(process.env.DISCORD_TOKEN);

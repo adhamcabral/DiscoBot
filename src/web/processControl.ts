@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import fs from 'fs/promises';
-import { files } from '../utils/paths.js';
+import { files } from '../config/paths.js';
 
 type BotProcessAction = 'start' | 'stop' | 'restart';
 

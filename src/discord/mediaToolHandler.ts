@@ -2,7 +2,7 @@ import { AttachmentBuilder, Message } from 'discord.js';
 import { callMcpTool } from '../mcp/client.js';
 import type { WritableTextChannel } from './types.js';
 import { editImagePreview, renderImageProgress, sendBase64Image, truncateDiscordContent } from './messageSender.js';
-import { logInteraction } from '../utils/logger.js';
+import { logInteraction } from '../logger.js';
 
 type MediaToolResult = {
   imageSent: boolean;
@@ -108,7 +108,7 @@ async function handleStickerEmojiResult(args: {
   return 'O emoji/sticker foi enviado diretamente no Discord. Não envie outra mensagem com link, markdown de imagem ou resumo.';
 }
 
-export async function handleDirectMediaToolResult(args: {
+export async function sendMediaToolResult(args: {
   functionName: string;
   mcpResult: string;
   channel: WritableTextChannel;

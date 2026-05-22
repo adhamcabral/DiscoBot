@@ -1,20 +1,19 @@
 import 'dotenv/config';
-import { server } from './web/server.js'; // Importa o servidor HTTP
-import { logger } from './utils/logger.js';
+import { server } from './web/server.js';
+import { logger } from './logger.js';
 import { initializeMcpClient } from './mcp/client.js';
-import { initializeAi } from './ai/openaiClient.js';
+import { initializeAi } from './openaiClient.js';
 
 const PORT = process.env.PORT || 3000;
 
 async function startWebServer() {
   await initializeAi();
 
-  // Inicia o servidor primeiro
+  // Start the panel before MCP retries so the admin UI still loads if tools are temporarily unavailable.
   server.listen(PORT, () => {
     logger.info(`Painel web na porta ${PORT}`);
   });
 
-  // Tenta conectar ao Tools Server com retries (silenciosamente)
   let retries = 5;
   let connected = false;
 

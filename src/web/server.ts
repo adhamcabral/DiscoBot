@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
-import { getSystemLogs, getInteractionLogs, logger } from '../utils/logger.js';
+import { getSystemLogs, getInteractionLogs, logger } from '../logger.js';
 import {
     getBlockedUsers,
     addBlockedUser,
@@ -10,17 +10,17 @@ import {
     cancelReminderById,
     type ReminderRecord,
     type ReminderStatus,
-} from '../utils/database.js';
-import { getAllTools, setToolEnabled, resetToolStats } from '../utils/toolsManager.js';
-import { getConfig, setCurrentModel, fetchAvailableModels } from '../utils/configManager.js';
+} from '../database.js';
+import { getAllTools, setToolEnabled, resetToolStats } from '../config/toolConfig.js';
+import { getConfig, setCurrentModel, fetchAvailableModels } from '../config/botConfig.js';
 import { getMcpStatus } from '../mcp/client.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
-import { files, ensureRuntimeDirs } from '../utils/paths.js';
+import { files, ensureRuntimeDirs } from '../config/paths.js';
 import { runBotProcessAction } from './processControl.js';
 
 const web = express();
-export const server = http.createServer(web); // Exporta o servidor HTTP
+export const server = http.createServer(web);
 const wss = new WebSocketServer({ server });
 
 const statusPath = files.status;
@@ -85,6 +85,7 @@ async function getReminderPanelState() {
     return { items, counts };
 }
 
+// The panel is state-push based: filesystem watchers trigger this when the bot writes status/log/signal files.
 async function broadcastState() {
     const state = await getFullState();
     const stateString = JSON.stringify({ type: 'UPDATE_STATE', payload: state });

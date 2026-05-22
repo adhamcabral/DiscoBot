@@ -5,8 +5,8 @@ import {
   markReminderFailed,
   markReminderSent,
   type ReminderRecord,
-} from '../utils/database.js';
-import { logger } from '../utils/logger.js';
+} from '../database.js';
+import { logger } from '../logger.js';
 
 const MAX_DUE_PER_TICK = 25;
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -110,6 +110,7 @@ async function scheduleNextReminder() {
   logger.debug(`Próximo lembrete agendado: ${nextReminder.id} em ${safeDelay}ms`);
 }
 
+// Called by the reminder tool after create/cancel so the scheduler does not wait for the old timeout.
 export function notifyReminderScheduleChanged() {
   if (!activeClient?.isReady()) return;
   void scheduleNextReminder();

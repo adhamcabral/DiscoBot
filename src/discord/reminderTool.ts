@@ -5,7 +5,7 @@ import {
   createReminder,
   listPendingRemindersForUser,
   type ReminderRecord,
-} from '../utils/database.js';
+} from '../database.js';
 import { notifyReminderScheduleChanged } from './reminderScheduler.js';
 import type { WritableTextChannel } from './types.js';
 

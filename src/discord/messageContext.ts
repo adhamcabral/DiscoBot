@@ -22,6 +22,7 @@ function appendImageAttachmentMarkers(message: Message, content: string, imageCa
   return nextContent;
 }
 
+// Keeps the model aware of recent Discord context while preserving image URLs for tools that need raw media.
 export async function buildConversationContext(message: Message, channel: WritableTextChannel) {
   const messageHistory = await channel.messages.fetch({ limit: 60 });
   const imageCandidates: ImageCandidate[] = [];

@@ -1,6 +1,6 @@
 import type { Message } from 'discord.js';
 import { callMcpTool } from '../mcp/client.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../logger.js';
 import { readDiscordContext } from './discordContextTool.js';
 import { scheduleReminder } from './reminderTool.js';
 import type { ImageCandidate, WritableTextChannel } from './types.js';
@@ -19,7 +19,7 @@ type ToolExecutionContext = {
 const errorTracking = new Map<string, ErrorTracker>();
 const IMAGE_URL_TOOL_NAMES = new Set(['sticker_emoji_creator', 'analyze_image', 'visual_search_image']);
 
-export function isDirectMediaTool(toolName: string) {
+export function sendsMediaDirectly(toolName: string) {
   return ['create_image', 'edit_image', 'sticker_emoji_creator', 'create_sticker_emoji'].includes(toolName);
 }
 
@@ -115,6 +115,7 @@ async function callImageUrlToolWithFallback(toolName: string, functionArgs: Reco
 
   let lastResult = '';
 
+  // Discord CDN URLs can expire or fail differently between canonical and proxy URLs, so try every candidate before giving up.
   for (const imageUrl of urlsToTry) {
     const result = await callMcpTool(toolName, { ...functionArgs, imageUrl });
     lastResult = result;
@@ -159,7 +160,8 @@ function formatToolError(toolName: string, error: unknown) {
   return `[ERRO NA FERRAMENTA] A ferramenta ${toolName} falhou com o erro: "${errorMessage}". Você pode tentar novamente com parâmetros diferentes, usar outra abordagem, ou informar o usuário sobre a falha. Analise o erro e decida a melhor ação.`;
 }
 
-export async function executeToolCall(
+// Dispatches model-requested tools across two runtimes: local Discord-bound handlers and generic MCP tools.
+export async function executeTool(
   toolName: string,
   functionArgs: Record<string, unknown>,
   imageCandidates: ImageCandidate[],
@@ -168,6 +170,7 @@ export async function executeToolCall(
   try {
     let result: string;
 
+    // These tools are advertised through MCP so the model can call them, but they need live Discord objects to run.
     if (toolName === 'read_discord_context') {
       if (!context) {
         throw new Error('Contexto do Discord indisponível para read_discord_context.');

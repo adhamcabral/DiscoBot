@@ -3,8 +3,8 @@ import {
   getResearchMemoryForMessages,
   pruneResearchMemoryToMessages,
   type ResearchMemoryRecord,
-} from '../utils/database.js';
-import { logger } from '../utils/logger.js';
+} from '../database.js';
+import { logger } from '../logger.js';
 
 const RESEARCH_TOOL_NAMES = new Set(['research_web', 'verify_web_claim', 'search_web', 'summarize_url', 'visual_search_image']);
 const MAX_ENTRIES_PER_CHANNEL = 24;
