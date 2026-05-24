@@ -1,6 +1,7 @@
 # DiscoBot
 
 An MCP (Model Context Protocol) Discord bot, which has several tools. including:
+
 - Search web
 - Analyze image
 - Visual search image
@@ -9,7 +10,10 @@ An MCP (Model Context Protocol) Discord bot, which has several tools. including:
 - Web scraping
 - Schedule Reminder
 
+## Requirements
 
+- Node.js v24.0.0 or newer
+- An Openai API key
 
 ## How to run
 
