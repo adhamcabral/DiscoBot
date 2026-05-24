@@ -1,3 +1,7 @@
+/**
+ * Starts the local MCP stdio server, registers discovered tools, and exposes
+ * only enabled tools to OpenAI.
+ */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type OpenAI from 'openai';

@@ -1,3 +1,7 @@
+/**
+ * Keeps gateway handling small: only DMs and explicit mentions reach the AI
+ * pipeline, preventing normal server traffic from becoming model context.
+ */
 import { Client, GatewayIntentBits, Partials, Message } from 'discord.js';
 import { handleMessage } from './messageHandler.js';
 

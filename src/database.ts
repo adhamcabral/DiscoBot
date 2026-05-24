@@ -1,3 +1,7 @@
+/**
+ * Durable state shared by the bot and panel: users, tool stats, reminders, and
+ * research memory. Schema setup is lazy so either process can boot alone.
+ */
 import fs from 'fs/promises';
 import Database from 'better-sqlite3';
 import { files, ensureRuntimeDirs } from './config/paths.js';

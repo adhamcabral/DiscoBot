@@ -1,44 +1,141 @@
 # DiscoBot
 
-An MCP (Model Context Protocol) Discord bot, which has several tools. including:
+DiscoBot is a Discord AI assistant built with Node.js, TypeScript, OpenAI, and MCP. It answers in DMs or when mentioned, can use tools for web research, images, stickers, reminders, and includes a small admin panel for operations.
 
-- Search web
-- Analyze image
-- Visual search image
-- Image generation
-- Sticker generation
-- Web scraping
-- Schedule Reminder
+## Features
+
+- Discord chat assistant with OpenAI.
+- MCP tools exposed as OpenAI function tools.
+- Web search, URL summarization, research, and claim verification.
+- Image analysis and visual search.
+- Image generation and editing with Discord progress updates.
+- Discord emoji and sticker generation/optimization.
+- Persistent reminders stored in SQLite.
+- Admin panel for status, logs, prompt editing, model selection, tool toggles, blocked users, and reminders.
 
 ## Requirements
 
-- Node.js v24.0.0 or newer
-- An Openai API key
+- Node.js 24 or newer.
+- Python 3 for the MCP stdio proxy.
+- Discord bot token.
+- OpenAI API key.
+- Optional: PM2 for background process scripts.
 
-## How to run
+## Setup
 
-Fill the '.env' file, 
-
-Commands to run the bot:
 ```bash
 npm install
-cp .env.example .env   
+cp .env.example .env
+```
+
+Fill `.env`:
+
+```bash
+DISCORD_TOKEN=
+OPENAI_API_KEY=
+```
+
+Optional environment variables:
+
+```bash
+PORT=3000
+BOT_TIMEZONE=America/Sao_Paulo
+LOG_WEBHOOK_URL=
+LOG_LEVEL=info
+MCP_TOOL_TIMEOUT_MS=180000
+MCP_RESEARCH_TIMEOUT_MS=900000
+```
+
+## Running
+
+```bash
 npm run build
 npm start
 ```
 
-Optional commands for debug:
+Useful commands:
 
 ```bash
-npm run start:web   # painel web
-npm run start:mcp   # servidor MCP stdio isolado, útil para inspeção/testes
+npm run start:bot   # Run only the Discord bot
+npm run start:web   # Run only the admin panel
+npm run start:mcp   # Run only the MCP server for inspection
+npm run build       # Compile TypeScript
 ```
 
+PM2 commands are also available:
 
-### Author
+```bash
+npm run start:all:bg
+npm run restart
+npm run logs:all
+npm run stop:all
+```
 
-Created by Adham Cabral
+## Architecture
 
-GitHub: https://github.com/adhamcabral
+The project runs as three local pieces:
 
-If you fork or redistribute this project, please preserve the original author attribution.
+- `src/bot.ts`: Discord process. Owns the gateway connection, OpenAI flow, tool loop, reminders, and Discord responses.
+- `src/web.ts`: admin panel process. Reads persisted state and exposes operational controls.
+- `src/mcp/server.ts`: local MCP stdio server. Provides generic tools used by OpenAI.
+
+Main message flow:
+
+```text
+Discord message
+-> recent context and attachments
+-> OpenAI chat completion
+-> optional MCP or Discord-local tool calls
+-> tool results back to OpenAI
+-> final Discord response
+```
+
+Some tools are declared through MCP but executed inside the Discord process because they need live Discord objects:
+
+- `read_discord_context`
+- `schedule_reminder`
+
+## Runtime Data
+
+Runtime files live under `data/`:
+
+```text
+data/config/bot.json       Selected model and cached model list
+data/config/tools.json     Tool enable/disable configuration
+data/state/bot.sqlite      SQLite database
+data/state/status.json     Bot heartbeat for the admin panel
+data/logs/system.log       System logs
+data/logs/interaction.log  Interaction logs
+```
+
+SQLite stores blocked users, tool stats, reminders, and compact research memory for follow-up questions.
+
+## Admin Panel
+
+The admin panel is served by `src/web/server.ts` and rendered from `views/index_new.ejs`.
+
+It can manage:
+
+- bot status and process controls;
+- MCP tool status and toggles;
+- selected OpenAI model;
+- system prompt;
+- logs;
+- blocked users;
+- reminders.
+
+The panel does not include authentication. Do not expose it publicly without adding access control or putting it behind a trusted authenticated proxy.
+
+## Notes
+
+- Source code lives in `src/`; compiled output goes to `dist/`.
+- The project uses native ES modules and strict TypeScript.
+- `npm test` is currently a placeholder.
+- Image jobs are process-local; restarting the MCP process cancels unfinished image work.
+- Web search relies on public HTML search result pages, so provider markup changes can affect results.
+
+## License
+
+See `LICENSE`.
+
+Created by Adham Cabral. If you fork or redistribute this project, preserve the original author attribution.

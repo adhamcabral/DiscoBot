@@ -1,3 +1,7 @@
+/**
+ * Runs image create/edit requests as process-local jobs so Discord can poll
+ * progress and send the final image as an attachment.
+ */
 import OpenAI from 'openai';
 import { toFile } from 'openai/uploads.js';
 import sharp from 'sharp';
@@ -69,6 +73,7 @@ export async function createImage(args: {
   const total = model === 'gpt-image-1' ? Math.max(1, Math.min(4, partial_images + 1)) : 1;
   imageJobs.set(jobId, { jobId, status: 'processing', total, completed: 0, partialImages: [], caption });
 
+  // Return a job ID quickly; Discord polls progress separately.
   void (async () => {
     try {
       const params: Record<string, unknown> = { model, prompt, n: 1 };
@@ -229,6 +234,7 @@ export async function editImage(args: {
   const total = model === 'gpt-image-1' ? Math.max(1, Math.min(4, partial_images + 1)) : 1;
   imageJobs.set(jobId, { jobId, status: 'processing', total, completed: 0, partialImages: [], caption });
 
+  // Normalize remote inputs before upload to avoid provider-specific image quirks.
   void (async () => {
     try {
       const sourceBuffers = await Promise.all(

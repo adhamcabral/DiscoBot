@@ -1,3 +1,7 @@
+/**
+ * Authoritative MCP tool schema. Discord-bound tools are declared here but
+ * executed by the Discord process where channel/message context exists.
+ */
 import 'dotenv/config';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

@@ -1,3 +1,7 @@
+/**
+ * Staged web research: discover sources, safely extract pages, then return
+ * structured evidence for the Discord-facing model to write from.
+ */
 import dns from 'dns/promises';
 import net from 'net';
 import OpenAI from 'openai';
@@ -499,6 +503,7 @@ async function summarizeOneUrl(rawUrl: string): Promise<ReadablePage> {
   };
 }
 
+// HTML search parsing is best-effort; failures are captured as diagnostics.
 async function collectSearchResults(query: string, limit = 8) {
   const safeLimit = Math.max(1, Math.min(15, Math.floor(limit || 8)));
   const attemptedQueries = buildSearchQueries(query);
@@ -815,6 +820,7 @@ async function synthesizeResearch(args: {
   });
 }
 
+// Returns evidence, not the final Discord answer; tone stays in the main model turn.
 export async function researchWeb({
   query,
   context,
@@ -907,6 +913,7 @@ export async function researchWeb({
   });
 }
 
+// Claim verification must prove support or contradiction; absence of evidence is unclear.
 export async function verifyWebClaim({
   claim,
   question,

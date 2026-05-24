@@ -1,3 +1,7 @@
+/**
+ * Builds OpenAI chat turns from prompt, runtime context, conversation history,
+ * selected model, and currently enabled MCP tool schemas.
+ */
 import fs from 'fs';
 import OpenAI from 'openai';
 import type { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/index.js';

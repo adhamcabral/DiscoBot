@@ -1,3 +1,7 @@
+/**
+ * Converts recent Discord history to OpenAI messages and preserves attachment
+ * URLs for tools without making old research memory globally sticky.
+ */
 import { Message } from 'discord.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/index.js';
 import type { ImageCandidate, WritableTextChannel } from './types.js';

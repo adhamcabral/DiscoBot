@@ -1,3 +1,7 @@
+/**
+ * Starts the admin panel process, which stays separate from the Discord gateway
+ * so operators can inspect state and restart the bot independently.
+ */
 import 'dotenv/config';
 import { server } from './web/server.js';
 import { logger } from './logger.js';

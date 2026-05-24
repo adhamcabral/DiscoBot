@@ -1,3 +1,7 @@
+/**
+ * Coordinates one Discord request through context collection, model/tool loops,
+ * media delivery, progress messages, logging, and the final response.
+ */
 import { Message } from 'discord.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/index.js';
 import { getNextAction } from '../openaiClient.js';

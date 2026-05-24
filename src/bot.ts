@@ -1,3 +1,7 @@
+/**
+ * Owns Discord process startup and writes the heartbeat consumed by the panel.
+ * Shared bot/panel state must go through SQLite or data/state files.
+ */
 import 'dotenv/config';
 import { client } from './discord/client.js';
 import { initializeMcpClient, shutdownMcpClient } from './mcp/client.js';

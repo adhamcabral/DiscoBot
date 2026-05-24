@@ -1,3 +1,7 @@
+/**
+ * Routes tool calls across MCP and Discord-local handlers while keeping one
+ * result shape for the model loop.
+ */
 import type { Message } from 'discord.js';
 import { callMcpTool } from '../mcp/client.js';
 import { logger } from '../logger.js';

@@ -1,3 +1,7 @@
+/**
+ * Separates visual description from evidence-backed identification so image
+ * guesses are not presented as confirmed facts.
+ */
 import OpenAI from 'openai';
 import { searchWeb } from './web.js';
 
@@ -258,6 +262,7 @@ function isMetaImageRecognitionText(value: string) {
   ].some(term => text.includes(term));
 }
 
+// Prefer exact visible clues; broad visual descriptions often find generic pages.
 function buildVisualSearchQueries(identification: VisualIdentification, question?: string, maxQueries = 8) {
   const queries: string[] = [];
 
@@ -422,6 +427,7 @@ async function rankVisualSearchResults(args: {
   }
 }
 
+// Ranking selects candidates; verification decides what is safe to claim.
 async function verifyVisualSearchAnswer(args: {
   question?: string;
   identification: VisualIdentification;
@@ -568,6 +574,7 @@ export async function analyzeImage(args: {
   }
 }
 
+// Treat image-derived entities as hypotheses until sources support the exact relation asked.
 export async function visualSearchImage(args: {
   imageUrl: string;
   question?: string;

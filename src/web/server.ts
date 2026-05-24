@@ -1,3 +1,7 @@
+/**
+ * Admin HTTP/WebSocket surface over persisted bot state, not direct in-memory
+ * access to the Discord process.
+ */
 import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
