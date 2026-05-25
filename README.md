@@ -4,7 +4,7 @@ DiscoBot is a Discord AI assistant built with Node.js, TypeScript, OpenAI, and M
 
 ## Features
 
-- Discord chat assistant with OpenAI.
+- Discord chat assistant with OpenAI Models.
 - MCP tools exposed as OpenAI function tools.
 - Web search, URL summarization, research, and claim verification.
 - Image analysis and visual search.
