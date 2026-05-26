@@ -3,7 +3,7 @@
  * pipeline, preventing normal server traffic from becoming model context.
  */
 import { Client, GatewayIntentBits, Partials, Message } from 'discord.js';
-import { handleMessage } from './messageHandler.js';
+import { queueIncomingMessage } from './messageBatcher.js';
 
 const client = new Client({
   intents: [
@@ -22,7 +22,7 @@ client.on('messageCreate', async (message: Message) => {
   const isDM = !message.guild;
 
   if (isMentioned || isDM) {
-    await handleMessage(message);
+    queueIncomingMessage(message);
   }
 });
 

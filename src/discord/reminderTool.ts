@@ -18,7 +18,16 @@ type ScheduleReminderArgs = {
   delaySeconds?: unknown;
   timezone?: unknown;
   reminderId?: unknown;
+  targetUserId?: unknown;
+  sourceMessageId?: unknown;
   limit?: unknown;
+};
+
+type ReminderTarget = {
+  userId: string;
+  messageId: string;
+  guildId?: string;
+  displayName: string;
 };
 
 function jsonText(value: unknown) {
@@ -48,6 +57,93 @@ function getDefaultTimezone() {
     || process.env.TZ
     || Intl.DateTimeFormat().resolvedOptions().timeZone
     || 'America/Sao_Paulo';
+}
+
+function listBatchTargets(triggerMessage: Message, batchMessages?: Message[]) {
+  const sourceMessages = batchMessages?.length ? batchMessages : [triggerMessage];
+  const unique = new Map<string, ReminderTarget>();
+
+  for (const message of sourceMessages) {
+    if (!unique.has(message.author.id)) {
+      unique.set(message.author.id, {
+        userId: message.author.id,
+        messageId: message.id,
+        guildId: message.guild?.id,
+        displayName: message.member?.displayName || message.author.username,
+      });
+    }
+  }
+
+  return [...unique.values()];
+}
+
+function findMessageById(triggerMessage: Message, batchMessages: Message[] | undefined, messageId?: string) {
+  if (!messageId) return undefined;
+  const sourceMessages = batchMessages?.length ? batchMessages : [triggerMessage];
+  return sourceMessages.find(message => message.id === messageId);
+}
+
+function resolveReminderTarget(
+  triggerMessage: Message,
+  args: ScheduleReminderArgs,
+  batchMessages?: Message[],
+) {
+  const targetUserId = getString(args.targetUserId);
+  const sourceMessageId = getString(args.sourceMessageId);
+  const sourceMessages = batchMessages?.length ? batchMessages : [triggerMessage];
+  const sourceMessage = findMessageById(triggerMessage, sourceMessages, sourceMessageId);
+  const targets = listBatchTargets(triggerMessage, sourceMessages);
+
+  // Multi-author batches must identify who owns the reminder.
+  if (targets.length > 1 && !targetUserId && !sourceMessageId) {
+    return {
+      ok: false as const,
+      error: 'Este lote tem mais de um autor. Informe targetUserId ou sourceMessageId para identificar o dono do lembrete.',
+      targets,
+      instruction: 'Peça esclarecimento em português ou refaça a chamada com targetUserId/sourceMessageId. Não diga que o lembrete foi agendado.',
+    };
+  }
+
+  if (sourceMessageId && !sourceMessage) {
+    return {
+      ok: false as const,
+      error: 'sourceMessageId não pertence ao lote atual de mensagens.',
+      targets,
+      instruction: 'Peça esclarecimento em português e não diga que o lembrete foi agendado.',
+    };
+  }
+
+  const resolvedUserId = targetUserId || sourceMessage?.author.id || triggerMessage.author.id;
+  const targetMessage = sourceMessages.find(message => message.author.id === resolvedUserId)
+    || (triggerMessage.author.id === resolvedUserId ? triggerMessage : undefined);
+
+  if (!targetMessage) {
+    return {
+      ok: false as const,
+      error: 'targetUserId não pertence ao lote atual de mensagens.',
+      targets,
+      instruction: 'Peça esclarecimento em português e não diga que o lembrete foi agendado.',
+    };
+  }
+
+  if (sourceMessage && targetUserId && sourceMessage.author.id !== targetUserId) {
+    return {
+      ok: false as const,
+      error: 'targetUserId não corresponde ao autor de sourceMessageId.',
+      targets,
+      instruction: 'Peça esclarecimento em português e não diga que o lembrete foi agendado.',
+    };
+  }
+
+  return {
+    ok: true as const,
+    target: {
+      userId: targetMessage.author.id,
+      messageId: sourceMessage?.id || targetMessage.id,
+      guildId: targetMessage.guild?.id,
+      displayName: targetMessage.member?.displayName || targetMessage.author.username,
+    },
+  };
 }
 
 function parseDueAt(value: unknown) {
@@ -118,10 +214,24 @@ async function createScheduledReminder(
   channel: WritableTextChannel,
   triggerMessage: Message,
   args: ScheduleReminderArgs,
+  batchMessages?: Message[],
 ) {
   const text = getString(args.text);
   const resolvedDueAt = resolveDueAt(args);
   const timezone = getString(args.timezone) || getDefaultTimezone();
+  const targetResult = resolveReminderTarget(triggerMessage, args, batchMessages);
+
+  if (!targetResult.ok) {
+    return jsonText({
+      success: false,
+      action: 'create',
+      error: targetResult.error,
+      availableTargets: targetResult.targets,
+      instruction: targetResult.instruction,
+    });
+  }
+
+  const target = targetResult.target;
 
   if (!text) {
     return jsonText({
@@ -149,10 +259,10 @@ async function createScheduledReminder(
 
   const reminder = await createReminder({
     id: `rem_${randomUUID()}`,
-    userId: triggerMessage.author.id,
+    userId: target.userId,
     channelId: channel.id,
-    guildId: triggerMessage.guild?.id,
-    messageId: triggerMessage.id,
+    guildId: target.guildId,
+    messageId: target.messageId,
     text,
     dueAt: dueAt.toISOString(),
     timezone,
@@ -166,29 +276,57 @@ async function createScheduledReminder(
     scheduledFrom: resolvedDueAt.source,
     delaySeconds: resolvedDueAt.delaySeconds,
     reminder: formatReminder(reminder),
-    instruction: 'Confirme o lembrete em português usando reminder.localDueAt e reminder.timezone. Não converta para UTC na resposta ao usuário. Inclua o ID caso ele queira cancelar depois.',
+    target,
+    instruction: 'Confirme o lembrete em português usando reminder.localDueAt e reminder.timezone. Não converta para UTC na resposta ao usuário. Inclua o ID caso ele queira cancelar depois. Se target.userId não for o autor da última mensagem, mencione claramente para quem foi agendado.',
   });
 }
 
-async function listScheduledReminders(triggerMessage: Message, args: ScheduleReminderArgs) {
-  const reminders = await listPendingRemindersForUser(triggerMessage.author.id, getLimit(args.limit));
+async function listScheduledReminders(triggerMessage: Message, args: ScheduleReminderArgs, batchMessages?: Message[]) {
+  const targetResult = resolveReminderTarget(triggerMessage, args, batchMessages);
+
+  if (!targetResult.ok) {
+    return jsonText({
+      success: false,
+      action: 'list',
+      error: targetResult.error,
+      availableTargets: targetResult.targets,
+      instruction: targetResult.instruction,
+    });
+  }
+
+  const target = targetResult.target;
+  const reminders = await listPendingRemindersForUser(target.userId, getLimit(args.limit));
 
   return jsonText({
     success: true,
     action: 'list',
     reminders: reminders.map(formatReminder),
     count: reminders.length,
+    target,
     instruction: reminders.length > 0
       ? 'Liste os lembretes pendentes em português usando localDueAt/timezone. Não apresente UTC como horário principal.'
       : 'Diga em português que o usuário não tem lembretes pendentes.',
   });
 }
 
-async function cancelScheduledReminder(triggerMessage: Message, args: ScheduleReminderArgs) {
+async function cancelScheduledReminder(triggerMessage: Message, args: ScheduleReminderArgs, batchMessages?: Message[]) {
   let reminderId = getString(args.reminderId);
+  const targetResult = resolveReminderTarget(triggerMessage, args, batchMessages);
+
+  if (!targetResult.ok) {
+    return jsonText({
+      success: false,
+      action: 'cancel',
+      error: targetResult.error,
+      availableTargets: targetResult.targets,
+      instruction: targetResult.instruction,
+    });
+  }
+
+  const target = targetResult.target;
 
   if (!reminderId) {
-    const pendingReminders = await listPendingRemindersForUser(triggerMessage.author.id, 2);
+    const pendingReminders = await listPendingRemindersForUser(target.userId, 2);
 
     if (pendingReminders.length === 1) {
       reminderId = pendingReminders[0].id;
@@ -207,7 +345,7 @@ async function cancelScheduledReminder(triggerMessage: Message, args: ScheduleRe
     }
   }
 
-  const reminder = await cancelReminder(reminderId, triggerMessage.author.id);
+  const reminder = await cancelReminder(reminderId, target.userId);
 
   if (!reminder) {
     return jsonText({
@@ -215,6 +353,7 @@ async function cancelScheduledReminder(triggerMessage: Message, args: ScheduleRe
       action: 'cancel',
       reminderId,
       error: 'Lembrete pendente não encontrado para este usuário.',
+      target,
       instruction: 'Diga em português que não encontrou um lembrete pendente com esse ID. Não diga que cancelou.',
     });
   }
@@ -225,6 +364,7 @@ async function cancelScheduledReminder(triggerMessage: Message, args: ScheduleRe
     success: true,
     action: 'cancel',
     reminder: formatReminder(reminder),
+    target,
     instruction: 'Confirme em português que o lembrete foi cancelado.',
   });
 }
@@ -233,16 +373,17 @@ export async function scheduleReminder(
   channel: WritableTextChannel,
   triggerMessage: Message,
   args: ScheduleReminderArgs,
+  batchMessages?: Message[],
 ) {
   const action = getAction(args.action);
 
   if (action === 'list') {
-    return listScheduledReminders(triggerMessage, args);
+    return listScheduledReminders(triggerMessage, args, batchMessages);
   }
 
   if (action === 'cancel') {
-    return cancelScheduledReminder(triggerMessage, args);
+    return cancelScheduledReminder(triggerMessage, args, batchMessages);
   }
 
-  return createScheduledReminder(channel, triggerMessage, args);
+  return createScheduledReminder(channel, triggerMessage, args, batchMessages);
 }

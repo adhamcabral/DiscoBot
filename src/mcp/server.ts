@@ -45,6 +45,8 @@ server.tool(
     delaySeconds: z.number().min(1).max(31622400).optional().describe('Atraso relativo em segundos. Prefira isto para pedidos como "em 5 minutos", "daqui 2 horas" ou "em 3 dias".'),
     timezone: z.string().optional().describe('Timezone IANA usado para explicar/listar o horário, por exemplo America/Sao_Paulo. Opcional; padrão do bot é usado se omitido.'),
     reminderId: z.string().optional().describe('ID do lembrete. Use para action=cancel quando informado. Se omitido e houver exatamente um lembrete pendente do usuário, a ferramenta cancela esse único lembrete; se houver vários, ela pedirá o ID.'),
+    targetUserId: z.string().optional().describe('ID do usuário dono do lembrete. Em lotes com mais de um autor, use o ID do autor da mensagem que pediu o lembrete.'),
+    sourceMessageId: z.string().optional().describe('ID da mensagem do lote atual que originou o pedido de lembrete. Use junto com targetUserId quando houver várias mensagens/autores no mesmo lote.'),
     limit: z.number().min(1).max(50).default(20).describe('Quantidade máxima de lembretes a listar para action=list.'),
   },
   scheduleReminder,

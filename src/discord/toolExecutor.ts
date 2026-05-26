@@ -18,6 +18,7 @@ type ErrorTracker = {
 type ToolExecutionContext = {
   channel: WritableTextChannel;
   triggerMessage: Message;
+  batchMessages?: Message[];
 };
 
 const errorTracking = new Map<string, ErrorTracker>();
@@ -186,7 +187,7 @@ export async function executeTool(
         throw new Error('Contexto do Discord indisponível para schedule_reminder.');
       }
 
-      result = await scheduleReminder(context.channel, context.triggerMessage, functionArgs);
+      result = await scheduleReminder(context.channel, context.triggerMessage, functionArgs, context.batchMessages);
     } else {
       result = IMAGE_URL_TOOL_NAMES.has(toolName)
         ? await callImageUrlToolWithFallback(toolName, functionArgs, imageCandidates)

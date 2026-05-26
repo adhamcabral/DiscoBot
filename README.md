@@ -43,6 +43,7 @@ BOT_TIMEZONE=America/Sao_Paulo
 ADMIN_TOKEN=
 ADMIN_SESSION_SECRET=
 ADMIN_SESSION_TTL_HOURS=12
+DISCORD_BATCH_DELAY_MS=15000
 LOG_WEBHOOK_URL=
 LOG_LEVEL=info
 MCP_TOOL_TIMEOUT_MS=180000
@@ -128,6 +129,8 @@ It can manage:
 - reminders.
 
 Set `ADMIN_TOKEN` to protect the panel with a login cookie. `ADMIN_SESSION_SECRET` should be a separate random value used to sign the cookie; if omitted, the token is reused as the signing secret. `ADMIN_SESSION_TTL_HOURS` controls session duration; set it to `0` for no server-side expiration. If `ADMIN_TOKEN` is not set, the panel starts without authentication for local development.
+
+`DISCORD_BATCH_DELAY_MS` controls how long the bot waits for additional messages in the same Discord chat before answering. The default is `15000` milliseconds.
 
 Do not expose the panel publicly without `ADMIN_TOKEN` and HTTPS or a trusted authenticated reverse proxy.
 

@@ -43,25 +43,43 @@ function parseToolArgs(functionName: string, rawArguments: string): ParsedToolAr
   }
 }
 
-// Orchestrates one Discord interaction: context -> model turn -> tool calls -> final Discord response.
+function getOrderedMessages(messages: Message[]) {
+  return [...messages].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+}
+
 export async function handleMessage(message: Message) {
+  await handleMessageBatch([message]);
+}
+
+// Orchestrates one Discord interaction batch: context -> model turn -> tool calls -> final Discord response.
+export async function handleMessageBatch(messages: Message[]) {
   let typingInterval: NodeJS.Timeout | null = null;
   const progressHandles: Array<{ dismiss: () => Promise<void> }> = [];
+  let message = getOrderedMessages(messages).at(-1);
 
   try {
+    if (!message) return;
+
     const channel = await resolveWritableChannel(message.channel);
     if (!channel) return;
 
     const blockedUsers = await getBlockedUsers();
-    if (blockedUsers.includes(message.author.id)) return;
+    const activeMessages = getOrderedMessages(messages).filter(item => !blockedUsers.includes(item.author.id));
+    if (activeMessages.length === 0) return;
+
+    message = activeMessages[activeMessages.length - 1];
 
     typingInterval = setInterval(() => channel.sendTyping(), 9000);
     await channel.sendTyping();
 
-    const { conversation, imageCandidates } = await buildConversationContext(message, channel);
+    const { conversation, imageCandidates } = await buildConversationContext(message, channel, activeMessages);
     const messagesForApi: ChatCompletionMessageParam[] = [...conversation];
     const toolsUsed: string[] = [];
     const toolDetails: string[] = [];
+    if (activeMessages.length > 1) {
+      const authors = [...new Set(activeMessages.map(item => `${item.author.username}:${item.author.id}`))].join(', ');
+      toolDetails.push(`message_batch: ${activeMessages.length} mensagens; authors=${authors}`);
+    }
     let imageSent = false;
     let responded = false;
     let exhaustedToolLoops = false;
@@ -113,6 +131,7 @@ export async function handleMessage(message: Message) {
         const toolResult = await executeTool(functionName, functionArgs, imageCandidates, {
           channel,
           triggerMessage: message,
+          batchMessages: activeMessages,
         });
         await progress?.complete(toolResult.ok, toolResult.result);
         if (toolResult.ok) toolDetails.push(toolResult.summary);
@@ -175,7 +194,7 @@ export async function handleMessage(message: Message) {
     }
   } catch (error) {
     logger.error('Erro ao lidar com a mensagem:', error);
-    if (message.channel?.isTextBased()) {
+    if (message?.channel?.isTextBased()) {
       await message.reply('Ocorreu um erro ao tentar responder.').catch(() => {});
     }
   } finally {
