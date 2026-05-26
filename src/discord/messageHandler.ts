@@ -6,6 +6,7 @@ import { Message } from 'discord.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/index.js';
 import { getNextAction } from '../openaiClient.js';
 import { getBlockedUsers } from '../database.js';
+import { getDisabledTools, isToolEnabled, loadToolsConfig } from '../config/toolConfig.js';
 import { logger, logInteraction } from '../logger.js';
 import { resolveWritableChannel } from './channelUtils.js';
 import { buildConversationContext } from './messageContext.js';
@@ -45,6 +46,16 @@ function parseToolArgs(functionName: string, rawArguments: string): ParsedToolAr
 
 function getOrderedMessages(messages: Message[]) {
   return [...messages].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+}
+
+function formatDisabledToolCall(functionName: string) {
+  const disabledTool = getDisabledTools().find(tool => tool.name === functionName);
+  const description = disabledTool?.description ? ` (${disabledTool.description})` : '';
+  return [
+    `[FERRAMENTA DESABILITADA] ${functionName}${description} está desabilitada pelo painel.`,
+    'Não chame outra ferramenta como substituta apenas para cumprir o pedido.',
+    'Responda ao usuário em português explicando de forma natural que essa capacidade está desabilitada no momento.',
+  ].join('\n');
 }
 
 export async function handleMessage(message: Message) {
@@ -113,6 +124,17 @@ export async function handleMessageBatch(messages: Message[]) {
 
         const functionName = toolCall.function.name;
         toolsUsed.push(functionName);
+
+        await loadToolsConfig();
+        if (!isToolEnabled(functionName)) {
+          toolDetails.push(`${functionName}: ferramenta desabilitada`);
+          messagesForApi.push({
+            tool_call_id: toolCall.id,
+            role: 'tool',
+            content: formatDisabledToolCall(functionName),
+          });
+          continue;
+        }
 
         const parsedArgs = parseToolArgs(functionName, toolCall.function.arguments);
         if (!parsedArgs.ok) {

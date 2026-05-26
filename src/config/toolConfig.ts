@@ -114,6 +114,15 @@ export async function getAllTools(): Promise<ToolConfig[]> {
     return tools;
 }
 
+export function getDisabledTools(): Array<{ name: string; description: string }> {
+    return Array.from(toolsConfig.values())
+        .filter(config => !config.enabled)
+        .map(config => ({
+            name: config.name,
+            description: config.description,
+        }));
+}
+
 export async function resetToolStats(name: string): Promise<void> {
     if (toolsConfig.has(name)) {
         await resetToolStatsInDb(name);

@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import type { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/index.js';
 import { getOpenAiTools } from './mcp/client.js';
 import { loadConfig, getCurrentModel, updateModelsIfNeeded } from './config/botConfig.js';
+import { getDisabledTools, loadToolsConfig } from './config/toolConfig.js';
 import { logger } from './logger.js';
 import { files } from './config/paths.js';
 
@@ -27,7 +28,7 @@ export async function initializeAi() {
   await updateModelsIfNeeded();
 }
 
-function getRuntimeContext() {
+async function getRuntimeContext() {
   const now = new Date();
   const timezone = process.env.BOT_TIMEZONE
     || process.env.TZ
@@ -39,6 +40,16 @@ function getRuntimeContext() {
     timeZone: timezone,
   }).format(now);
 
+  await loadToolsConfig();
+  const disabledTools = getDisabledTools();
+  const disabledToolContext = disabledTools.length > 0
+    ? [
+      '## Ferramentas desabilitadas pelo painel',
+      ...disabledTools.map(tool => `- ${tool.name}: ${tool.description}`),
+      'Se o pedido do usuário exigir uma ferramenta desabilitada, não use outra ferramenta como substituta. Diga de forma natural que essa capacidade está desabilitada no momento.',
+    ].join('\n')
+    : '## Ferramentas desabilitadas pelo painel\nNenhuma.';
+
   return [
     '## Contexto de runtime',
     `Agora em UTC ISO: ${now.toISOString()}`,
@@ -46,6 +57,7 @@ function getRuntimeContext() {
     `Timezone padrão para o usuário: ${timezone}`,
     'Para lembretes relativos como "em 5 minutos", "daqui 2 horas" ou "em 3 dias", prefira chamar schedule_reminder com delaySeconds em vez de calcular dueAt manualmente.',
     'Para lembretes com data/hora absoluta, use dueAt em ISO 8601 com offset/timezone explícito. Se faltar data, hora ou texto, peça esclarecimento antes de agendar.',
+    disabledToolContext,
   ].join('\n');
 }
 
@@ -59,12 +71,13 @@ export async function getNextAction(
     .replace('{{currentUser.name}}', currentUser.name)
     .replace('{{currentUser.id}}', currentUser.id);
 
+  const runtimeContext = await getRuntimeContext();
   const response = await openai.chat.completions.create({
     model: getCurrentModel(),
     messages: [
       {
         role: 'system',
-        content: `${populatedPrompt}\n\n${getRuntimeContext()}`,
+        content: `${populatedPrompt}\n\n${runtimeContext}`,
       },
       ...messages,
     ],
