@@ -15,7 +15,7 @@ import { recordResearchMemory } from './researchMemory.js';
 import { executeTool, sendsMediaDirectly } from './toolExecutor.js';
 import { startToolProgress } from './toolProgress.js';
 
-const MAX_TOOL_LOOPS = 10;
+const MAX_TOOL_LOOPS = 15;
 const AI_TIMEOUT_MS = 900000;
 
 type ParsedToolArgs =
@@ -63,6 +63,8 @@ export async function handleMessage(message: Message) {
     const toolsUsed: string[] = [];
     const toolDetails: string[] = [];
     let imageSent = false;
+    let responded = false;
+    let exhaustedToolLoops = false;
 
     // The model may need several tool/result rounds; the loop cap prevents runaway tool recursion.
     for (let i = 0; i < MAX_TOOL_LOOPS; i++) {
@@ -75,6 +77,7 @@ export async function handleMessage(message: Message) {
           await Promise.all(progressHandles.map(progress => progress.dismiss()));
           await replyLongMessage(message, channel, nextAction.content);
           await logInteraction(message, nextAction.content, toolsUsed, toolDetails);
+          responded = true;
         }
         break;
       }
@@ -142,6 +145,33 @@ export async function handleMessage(message: Message) {
           content: functionResponseContent,
         });
       }
+
+      exhaustedToolLoops = i === MAX_TOOL_LOOPS - 1;
+    }
+
+    if (exhaustedToolLoops && !responded && !imageSent) {
+      const currentUser = { id: message.author.id, name: message.author.username };
+      const fallbackMessage: ChatCompletionMessageParam = {
+        role: 'system',
+        content: [
+          `O limite interno de ${MAX_TOOL_LOOPS} rodadas de ferramentas foi atingido sem resposta final ao usuário.`,
+          'Responda agora em português ao usuário, sem chamar mais ferramentas.',
+          'Explique de forma natural que você não conseguiu concluir a ação com as informações/etapas disponíveis.',
+          'Não exponha logs, stack traces, mensagens internas, JSON bruto ou nomes técnicos desnecessários.',
+          'Se houver uma alternativa útil, peça uma reformulação ou uma parte mais específica do pedido.',
+        ].join('\n'),
+      };
+
+      const finalAction = await getNextAction([...messagesForApi, fallbackMessage], currentUser, AI_TIMEOUT_MS);
+      const finalContent = finalAction.content
+        || 'Não consegui concluir a ação depois de várias etapas. Tente reformular o pedido ou pedir uma parte mais específica.';
+
+      await Promise.all(progressHandles.map(progress => progress.dismiss()));
+      await replyLongMessage(message, channel, finalContent);
+      await logInteraction(message, finalContent, toolsUsed, [
+        ...toolDetails,
+        `tool_loop_limit: limite de ${MAX_TOOL_LOOPS} rodadas atingido`,
+      ]);
     }
   } catch (error) {
     logger.error('Erro ao lidar com a mensagem:', error);
