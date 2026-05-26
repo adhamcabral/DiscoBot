@@ -18,6 +18,31 @@ import { startToolProgress } from './toolProgress.js';
 const MAX_TOOL_LOOPS = 10;
 const AI_TIMEOUT_MS = 900000;
 
+type ParsedToolArgs =
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; error: string };
+
+function parseToolArgs(functionName: string, rawArguments: string): ParsedToolArgs {
+  try {
+    const parsed = JSON.parse(rawArguments || '{}');
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        ok: false,
+        error: `[ARGUMENTOS INVÁLIDOS] A ferramenta ${functionName} precisa receber um objeto JSON como arguments. Recebido: ${rawArguments || '(vazio)'}`,
+      };
+    }
+
+    return { ok: true, value: parsed as Record<string, unknown> };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      error: `[ARGUMENTOS INVÁLIDOS] Não foi possível ler os arguments da ferramenta ${functionName} como JSON válido: "${message}". Refaça a chamada usando um objeto JSON válido e compatível com o schema da ferramenta.`,
+    };
+  }
+}
+
 // Orchestrates one Discord interaction: context -> model turn -> tool calls -> final Discord response.
 export async function handleMessage(message: Message) {
   let typingInterval: NodeJS.Timeout | null = null;
@@ -68,7 +93,18 @@ export async function handleMessage(message: Message) {
         const functionName = toolCall.function.name;
         toolsUsed.push(functionName);
 
-        const functionArgs = JSON.parse(toolCall.function.arguments);
+        const parsedArgs = parseToolArgs(functionName, toolCall.function.arguments);
+        if (!parsedArgs.ok) {
+          toolDetails.push(`${functionName}: argumentos inválidos`);
+          messagesForApi.push({
+            tool_call_id: toolCall.id,
+            role: 'tool',
+            content: parsedArgs.error,
+          });
+          continue;
+        }
+
+        const functionArgs = parsedArgs.value;
         const progress = await startToolProgress(channel, functionName, functionArgs);
         if (progress) progressHandles.push(progress);
         const toolResult = await executeTool(functionName, functionArgs, imageCandidates, {
