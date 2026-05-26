@@ -22,6 +22,14 @@ import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import { files, ensureRuntimeDirs } from '../config/paths.js';
 import { runBotProcessAction } from './processControl.js';
+import {
+    clearAdminSessionCookie,
+    createAdminSessionCookie,
+    isAuthEnabled,
+    isPanelRequestAuthenticated,
+    requirePanelAuth,
+    verifyAdminToken,
+} from './auth.js';
 
 const web = express();
 export const server = http.createServer(web);
@@ -38,6 +46,14 @@ web.set('views', path.join(process.cwd(), 'views'));
 web.use(express.static(path.join(process.cwd(), 'public')));
 web.use(express.urlencoded({ extended: true }));
 web.use(express.json());
+
+function getSafeNext(value: unknown) {
+    if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+        return '/';
+    }
+
+    return value;
+}
 
 async function getFullState() {
     const [botStatus, systemLogs, interactionLogs, blockedUserIds, tools, botConfig, mcpStatus, reminders] = await Promise.all([
@@ -120,7 +136,12 @@ void (async () => {
 })();
 
 
-wss.on('connection', (_ws) => {
+wss.on('connection', (ws, req) => {
+    if (!isPanelRequestAuthenticated(req)) {
+        ws.close(1008, 'Não autenticado');
+        return;
+    }
+
     logger.debug('Cliente conectado ao painel via WebSocket.');
     broadcastState();
 });
@@ -137,6 +158,44 @@ async function getBotStatus() {
         return { isReady: false, userTag: 'Offline', serverCount: 0, uptime: 'N/A' };
     }
 }
+
+web.get('/login', (req, res) => {
+    if (!isAuthEnabled()) {
+        res.redirect('/');
+        return;
+    }
+
+    res.render('login', {
+        error: null,
+        next: getSafeNext(req.query.next),
+    });
+});
+
+web.post('/login', (req, res) => {
+    if (!isAuthEnabled()) {
+        res.redirect('/');
+        return;
+    }
+
+    const next = getSafeNext(req.body.next);
+    if (!verifyAdminToken(req.body.token)) {
+        res.status(401).render('login', {
+            error: 'Token inválido.',
+            next,
+        });
+        return;
+    }
+
+    res.setHeader('Set-Cookie', createAdminSessionCookie(req));
+    res.redirect(next);
+});
+
+web.post('/logout', (req, res) => {
+    res.setHeader('Set-Cookie', clearAdminSessionCookie(req));
+    res.redirect('/login');
+});
+
+web.use(requirePanelAuth);
 
 web.get('/', async (_req, res) => {
   try {

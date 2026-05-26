@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiscoBot Admin - Login</title>
+    <link rel="stylesheet" href="/css/style_new.css">
+</head>
+<body class="login-page">
+    <main class="login-shell">
+        <form class="login-card" action="/login" method="POST">
+            <div class="login-heading">
+                <h1>DiscoBot</h1>
+                <span>Admin Console</span>
+            </div>
+
+            <% if (error) { %>
+                <div class="login-error"><%= error %></div>
+            <% } %>
+
+            <input type="hidden" name="next" value="<%= next %>">
+            <label for="admin-token">TOKEN</label>
+            <input id="admin-token" type="password" name="token" autocomplete="current-password" autofocus required>
+            <button type="submit" class="btn btn-primary">LOGIN</button>
+        </form>
+    </main>
+</body>
+</html>

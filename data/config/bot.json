@@ -60,9 +60,6 @@
     "gpt-4o-transcribe",
     "gpt-4o-search-preview-2025-03-11",
     "gpt-4o-search-preview",
-    "gpt-4o-realtime-preview-2025-06-03",
-    "gpt-4o-realtime-preview-2024-12-17",
-    "gpt-4o-realtime-preview",
     "gpt-4o-mini-tts-2025-12-15",
     "gpt-4o-mini-tts-2025-03-20",
     "gpt-4o-mini-tts",
@@ -71,8 +68,6 @@
     "gpt-4o-mini-transcribe",
     "gpt-4o-mini-search-preview-2025-03-11",
     "gpt-4o-mini-search-preview",
-    "gpt-4o-mini-realtime-preview-2024-12-17",
-    "gpt-4o-mini-realtime-preview",
     "gpt-4o-mini-2024-07-18",
     "gpt-4o-mini",
     "gpt-4o-2024-11-20",
@@ -94,5 +89,5 @@
     "gpt-3.5-turbo-0125",
     "gpt-3.5-turbo"
   ],
-  "lastModelsUpdate": "2026-05-17T16:42:27.858Z"
+  "lastModelsUpdate": "2026-05-26T02:06:49.183Z"
 }

@@ -109,6 +109,20 @@ body {
     font-size: 0.9rem;
 }
 
+.logout-form {
+    padding: 0 0 0.25rem;
+}
+
+.logout-button {
+    width: 100%;
+    background: transparent;
+    border-top: 1px solid var(--border);
+    border-right: 0;
+    border-bottom: 0;
+    cursor: pointer;
+    font: inherit;
+}
+
 /* Main Content */
 .main-content {
     flex: 1;
@@ -829,7 +843,8 @@ textarea:focus {
     border-color: var(--accent-primary);
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="password"] {
     background: var(--bg-tertiary);
     color: var(--text-primary);
     border: 1px solid var(--border);
@@ -839,7 +854,8 @@ input[type="text"] {
     flex: 1;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="password"]:focus {
     outline: none;
     border-color: var(--accent-primary);
 }
@@ -886,6 +902,67 @@ input[type="text"]:focus {
 .info-text {
     color: var(--text-secondary);
     font-size: 0.875rem;
+}
+
+/* Login */
+.login-page {
+    min-height: 100vh;
+    height: auto;
+    display: grid;
+    place-items: center;
+    overflow: auto;
+    padding: 1rem;
+}
+
+.login-shell {
+    width: min(100%, 420px);
+}
+
+.login-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.login-heading {
+    margin-bottom: 1.5rem;
+}
+
+.login-heading h1 {
+    font-size: 1.35rem;
+    line-height: 1.2;
+}
+
+.login-heading span {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.login-card label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.login-card input[type="password"] {
+    width: 100%;
+}
+
+.login-error {
+    margin-bottom: 1rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--text-primary);
+    font-size: 0.9rem;
 }
 
 /* Scrollbar */
@@ -950,6 +1027,10 @@ input[type="text"]:focus {
         display: flex;
         padding: 0;
         gap: 0.5rem;
+    }
+
+    .logout-form {
+        padding: 0;
     }
 
     .nav-item {
