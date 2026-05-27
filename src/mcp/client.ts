@@ -2,12 +2,17 @@
  * Starts the local MCP stdio server, registers discovered tools, and exposes
  * only enabled tools to OpenAI.
  */
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type OpenAI from 'openai';
-import path from 'path';
-import { logger } from '../logger.js';
-import { loadToolsConfig, registerTool, isToolEnabled, recordToolExecution } from '../config/toolConfig.js';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type OpenAI from "openai";
+import path from "path";
+import { logger } from "../logger.js";
+import {
+  loadToolsConfig,
+  registerTool,
+  isToolEnabled,
+  recordToolExecution,
+} from "../config/toolConfig.js";
 
 type McpTool = {
   name: string;
@@ -21,44 +26,53 @@ let isConnecting = false;
 let connected = false;
 let reconnectAttempts = 0;
 
-const DEFAULT_MCP_TOOL_TIMEOUT_MS = Number(process.env.MCP_TOOL_TIMEOUT_MS || 180000);
-const RESEARCH_MCP_TOOL_TIMEOUT_MS = Number(process.env.MCP_RESEARCH_TIMEOUT_MS || 900000);
+const DEFAULT_MCP_TOOL_TIMEOUT_MS = Number(
+  process.env.MCP_TOOL_TIMEOUT_MS || 180000,
+);
+const RESEARCH_MCP_TOOL_TIMEOUT_MS = Number(
+  process.env.MCP_RESEARCH_TIMEOUT_MS || 900000,
+);
 const LONG_RUNNING_TOOLS = new Set([
-  'research_web',
-  'verify_web_claim',
-  'visual_search_image',
-  'create_image',
-  'edit_image',
-  'get_image_result',
+  "research_web",
+  "verify_web_claim",
+  "visual_search_image",
+  "create_image",
+  "edit_image",
+  "get_image_result",
 ]);
 
 function getServerPath() {
-  return path.join(process.cwd(), 'dist', 'mcp', 'server.js');
+  return path.join(process.cwd(), "dist", "mcp", "server.js");
 }
 
 function getProxyPath() {
-  return path.join(process.cwd(), 'scripts', 'mcp_stdio_proxy.py');
+  return path.join(process.cwd(), "scripts", "mcp_stdio_proxy.py");
 }
 
-function toOpenAiTool(tool: McpTool): OpenAI.Chat.Completions.ChatCompletionTool {
+function toOpenAiTool(
+  tool: McpTool,
+): OpenAI.Chat.Completions.ChatCompletionTool {
   return {
-    type: 'function',
+    type: "function",
     function: {
       name: tool.name,
-      description: tool.description || '',
-      parameters: tool.inputSchema || { type: 'object', properties: {} },
+      description: tool.description || "",
+      parameters: tool.inputSchema || { type: "object", properties: {} },
     },
   };
 }
 
 function mcpResultToText(result: unknown): string {
-  const maybeResult = result as { content?: Array<{ type?: string; text?: string }> };
-  const textParts = maybeResult.content
-    ?.filter((part) => part.type === 'text' && typeof part.text === 'string')
-    .map((part) => part.text) || [];
+  const maybeResult = result as {
+    content?: Array<{ type?: string; text?: string }>;
+  };
+  const textParts =
+    maybeResult.content
+      ?.filter((part) => part.type === "text" && typeof part.text === "string")
+      .map((part) => part.text) || [];
 
   if (textParts.length > 0) {
-    return textParts.join('\n');
+    return textParts.join("\n");
   }
 
   return JSON.stringify(result);
@@ -66,16 +80,16 @@ function mcpResultToText(result: unknown): string {
 
 async function connectMcpClient() {
   const client = new Client({
-    name: 'discord-bot-host',
-    version: '1.0.0',
+    name: "discobot-host",
+    version: "1.0.0",
   });
 
   const stdioTransport = new StdioClientTransport({
-    command: process.env.MCP_STDIO_PROXY_COMMAND || 'python3',
+    command: process.env.MCP_STDIO_PROXY_COMMAND || "python3",
     args: [getProxyPath(), process.execPath, getServerPath()],
     env: {
       ...process.env,
-      NODE_ENV: process.env.NODE_ENV || 'production',
+      NODE_ENV: process.env.NODE_ENV || "production",
     } as Record<string, string>,
   });
 
@@ -85,7 +99,7 @@ async function connectMcpClient() {
   tools = response.tools as McpTool[];
 
   for (const tool of tools) {
-    await registerTool(tool.name, tool.description || '');
+    await registerTool(tool.name, tool.description || "");
   }
 
   mcpClient = client;
@@ -108,7 +122,7 @@ export async function initializeMcpClient() {
   } catch (error) {
     connected = false;
     reconnectAttempts++;
-    logger.error('Erro ao inicializar cliente MCP stdio:', error);
+    logger.error("Erro ao inicializar cliente MCP stdio:", error);
     throw error;
   } finally {
     isConnecting = false;
@@ -120,14 +134,19 @@ async function ensureMcpClient() {
   await initializeMcpClient();
 }
 
-export async function getOpenAiTools(): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+export async function getOpenAiTools(): Promise<
+  OpenAI.Chat.Completions.ChatCompletionTool[]
+> {
   await ensureMcpClient();
   await loadToolsConfig();
   return tools.filter((tool) => isToolEnabled(tool.name)).map(toOpenAiTool);
 }
 
 // MCP timeouts are split because research/image jobs are intentionally long-running, unlike normal utility calls.
-export async function callMcpTool(toolName: string, args: Record<string, unknown>): Promise<string> {
+export async function callMcpTool(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   await ensureMcpClient();
   await loadToolsConfig();
 
@@ -141,13 +160,17 @@ export async function callMcpTool(toolName: string, args: Record<string, unknown
     : DEFAULT_MCP_TOOL_TIMEOUT_MS;
 
   try {
-    const result = await mcpClient!.callTool({
-      name: toolName,
-      arguments: args,
-    }, undefined, {
-      timeout,
-      maxTotalTimeout: timeout,
-    });
+    const result = await mcpClient!.callTool(
+      {
+        name: toolName,
+        arguments: args,
+      },
+      undefined,
+      {
+        timeout,
+        maxTotalTimeout: timeout,
+      },
+    );
 
     success = true;
     return mcpResultToText(result);

@@ -66,21 +66,24 @@ npm run start:mcp   # Run only the MCP server for inspection
 npm run build       # Compile TypeScript
 ```
 
-PM2 commands are also available:
+Using PM2 for background execution (run startup if you want to run the bot on system startup):
 
 ```bash
-pm2 save
-pm2 startup
-pm2 save
-pm2 start
+npm install -g pm2
 ```
 
 ```bash
 npm run start:all:bg
 npm run restart
-npm run logs:all
-npm run stop:all
+pm2 status
+pm2 startup
 ```
+
+Then run the command shown by pm2 startup, then:
+```bash
+pm2 save
+```
+
 
 ## Architecture
 
