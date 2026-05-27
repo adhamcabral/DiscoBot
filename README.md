@@ -69,6 +69,13 @@ npm run build       # Compile TypeScript
 PM2 commands are also available:
 
 ```bash
+pm2 save
+pm2 startup
+pm2 save
+pm2 start
+```
+
+```bash
 npm run start:all:bg
 npm run restart
 npm run logs:all
