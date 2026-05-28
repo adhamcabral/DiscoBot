@@ -11,7 +11,7 @@ DiscoBot is a Discord AI assistant built with Node.js, TypeScript, OpenAI, and M
 - Image generation and editing with Discord progress updates.
 - Discord emoji and sticker generation/optimization.
 - Persistent reminders stored in SQLite.
-- Admin panel for status, logs, prompt editing, model selection, tool toggles, blocked users, and reminders.
+- Admin panel with authentication for status, logs, prompt editing, model selection, tool toggles, blocked users, and reminders.
 
 ## Requirements
 
