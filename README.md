@@ -20,6 +20,7 @@ DiscoBot is a Discord AI assistant built with Node.js, TypeScript, OpenAI, and M
 - OpenAI API key.
 - Optional: PM2 for background process scripts.
 - Optional: Python 3 for the MCP stdio proxy.
+- Optional: Discord Webhooks for logging.
 
 ## Setup
 
