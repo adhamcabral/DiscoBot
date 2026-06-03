@@ -1,6 +1,6 @@
 # DiscoBot
 
-DiscoBot is a Discord AI assistant built with Node.js, TypeScript, OpenAI, and MCP. It answers in DMs or when mentioned, can use tools for web research, images, stickers, reminders, and includes a small admin panel for operations.
+DiscoBot is a Discord AI bot assistant built with Node.js, TypeScript, OpenAI, and MCP. It answers in DMs or when mentioned, can use tools for web research, images, stickers, reminders, and includes a small admin panel for operations.
 
 ## Features
 
