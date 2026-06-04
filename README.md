@@ -147,7 +147,7 @@ Do not expose the panel publicly without `ADMIN_TOKEN` and HTTPS or a trusted au
 
 ## Notes
 
-- Source code lives in `src/`; compiled output goes to `dist/`.
+- Source ts code lives in `src/`; compiled js output goes to `dist/`.
 - The project uses native ES modules and strict TypeScript.
 - `npm test` is currently a placeholder.
 - Image jobs are process-local; restarting the MCP process cancels unfinished image work.
