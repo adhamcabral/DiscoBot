@@ -79,6 +79,9 @@ npm run restart
 pm2 status
 pm2 startup
 ```
+```bash
+pm2 logs
+```
 
 Then run the command shown by pm2 startup, then:
 ```bash
