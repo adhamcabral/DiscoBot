@@ -79,6 +79,8 @@ npm run restart
 pm2 status
 pm2 startup
 ```
+Run for view logs
+
 ```bash
 pm2 logs
 ```
